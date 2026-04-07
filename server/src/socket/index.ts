@@ -4,6 +4,7 @@ import { config } from '../config';
 import { setupDeviceSocket } from './device.socket';
 import { setupLogcatSocket } from './logcat.socket';
 import { setupShellSocket } from './shell.socket';
+import { setupScreenSocket } from './screen.socket';
 import { logger } from '../utils/logger';
 
 export function createSocketServer(httpServer: HttpServer): Server {
@@ -17,8 +18,9 @@ export function createSocketServer(httpServer: HttpServer): Server {
   setupDeviceSocket(io.of('/devices'));
   setupLogcatSocket(io.of('/logcat'));
   setupShellSocket(io.of('/shell'));
+  setupScreenSocket(io.of('/screen'));
 
-  logger.info('Socket.IO server initialized with namespaces: /devices, /logcat, /shell');
+  logger.info('Socket.IO server initialized with namespaces: /devices, /logcat, /shell, /screen');
 
   return io;
 }

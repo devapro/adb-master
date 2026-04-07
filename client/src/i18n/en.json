@@ -8,7 +8,8 @@
     "logcat": "Logcat",
     "terminal": "Terminal",
     "input": "Input",
-    "settings": "Settings"
+    "settings": "Settings",
+    "screen": "Screen"
   },
   "header": {
     "title": "ADB Master",
@@ -318,5 +319,14 @@
     "close": "Close",
     "success": "Success",
     "back": "Back"
+  },
+  "screen": {
+    "title": "Screen Stream",
+    "start": "Start Stream",
+    "stop": "Stop Stream",
+    "fps": "FPS",
+    "frames": "frames",
+    "placeholder": "Press Start Stream to begin",
+    "waiting": "Waiting for first frame..."
   }
 }

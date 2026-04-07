@@ -9,7 +9,7 @@ function createSocketForMode(namespace: string): Socket {
 
   if (mode === 'remote' && relayUrl) {
     return io(`${relayUrl}${namespace}`, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling'], // relay rejects WebSocket upgrades; polling is tunneled via HTTP
       autoConnect: false,
       query: { session: sessionId, password: password || '' },
       extraHeaders: { 'x-relay-session': sessionId },
@@ -56,6 +56,14 @@ export const logcatSocket: Socket = new Proxy({} as Socket, {
 export const shellSocket: Socket = new Proxy({} as Socket, {
   get(_target, prop) {
     const sock = getSocket('/shell');
+    const value = (sock as unknown as Record<string | symbol, unknown>)[prop];
+    return typeof value === 'function' ? (value as Function).bind(sock) : value;
+  },
+});
+
+export const screenSocket: Socket = new Proxy({} as Socket, {
+  get(_target, prop) {
+    const sock = getSocket('/screen');
     const value = (sock as unknown as Record<string | symbol, unknown>)[prop];
     return typeof value === 'function' ? (value as Function).bind(sock) : value;
   },
