@@ -1,0 +1,80 @@
+.terminal-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 92px);
+}
+
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.terminal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connection-status {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.connection-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+.connection-status.online::before {
+  background: var(--color-success);
+}
+
+.terminal-container {
+  flex: 1;
+  min-height: 0;
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  overflow: hidden;
+}
+
+.script-results {
+  margin-top: 12px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.script-results-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.script-output {
+  padding: 12px;
+  font-size: 12px;
+  overflow-y: auto;
+  color: var(--color-text-secondary);
+  flex: 1;
+}

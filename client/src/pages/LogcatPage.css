@@ -1,0 +1,109 @@
+.logcat-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 92px);
+}
+
+.logcat-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.logcat-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.logcat-filters .form-input {
+  max-width: 160px;
+}
+
+.logcat-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.auto-scroll-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.logcat-container {
+  flex: 1;
+  min-height: 0;
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.logcat-scroller {
+  height: 100% !important;
+}
+
+.logcat-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.logcat-line {
+  display: flex;
+  gap: 8px;
+  padding: 2px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logcat-line:hover {
+  background: var(--color-surface-hover);
+}
+
+.logcat-time {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  width: 120px;
+}
+
+.logcat-pid {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  width: 50px;
+}
+
+.logcat-level {
+  flex-shrink: 0;
+  width: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.logcat-tag {
+  color: var(--color-accent);
+  flex-shrink: 0;
+  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logcat-msg {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  color: var(--color-text-primary);
+}

@@ -1,0 +1,624 @@
+openapi: 3.0.3
+info:
+  title: ADB Master API
+  version: 1.0.0
+  description: REST API for managing Android devices via ADB
+
+servers:
+  - url: http://localhost:3000/api
+
+tags:
+  - name: Health
+  - name: Devices
+  - name: Apps
+  - name: Files
+  - name: Network
+  - name: Logcat
+  - name: Shell
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: Server is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+
+  /devices:
+    get:
+      tags: [Devices]
+      summary: List connected devices
+      responses:
+        "200":
+          description: List of devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceListResponse"
+
+  /devices/{serial}:
+    get:
+      tags: [Devices]
+      summary: Get device info
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      responses:
+        "200":
+          description: Device info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /devices/{serial}/apps:
+    get:
+      tags: [Apps]
+      summary: List installed apps
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [system, user, preinstalled, all]
+            default: all
+      responses:
+        "200":
+          description: List of apps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppListResponse"
+
+  /devices/{serial}/apps/{packageName}:
+    delete:
+      tags: [Apps]
+      summary: Uninstall app
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - $ref: "#/components/parameters/PackageName"
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppActionResponse"
+
+  /devices/{serial}/apps/{packageName}/disable:
+    post:
+      tags: [Apps]
+      summary: Disable app
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - $ref: "#/components/parameters/PackageName"
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppActionResponse"
+
+  /devices/{serial}/apps/{packageName}/stop:
+    post:
+      tags: [Apps]
+      summary: Force stop app
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - $ref: "#/components/parameters/PackageName"
+      responses:
+        "200":
+          description: Action result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppActionResponse"
+
+  /devices/{serial}/files:
+    get:
+      tags: [Files]
+      summary: List files in directory
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - name: path
+          in: query
+          schema:
+            type: string
+            default: /sdcard
+        - name: minSize
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileListResponse"
+    delete:
+      tags: [Files]
+      summary: Delete a file or directory
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path:
+                  type: string
+                isDirectory:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: Delete result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /devices/{serial}/files/large:
+    get:
+      tags: [Files]
+      summary: Find large files
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - name: path
+          in: query
+          schema:
+            type: string
+            default: /sdcard
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Large files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileListResponse"
+
+  /devices/{serial}/storage:
+    get:
+      tags: [Files]
+      summary: Get storage summary
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      responses:
+        "200":
+          description: Storage info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageResponse"
+
+  /devices/{serial}/network/wifi:
+    get:
+      tags: [Network]
+      summary: Get WiFi status
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      responses:
+        "200":
+          description: WiFi status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WifiResponse"
+    post:
+      tags: [Network]
+      summary: Enable/disable WiFi
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /devices/{serial}/network/proxy:
+    get:
+      tags: [Network]
+      summary: Get proxy settings
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      responses:
+        "200":
+          description: Proxy settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyResponse"
+    put:
+      tags: [Network]
+      summary: Set proxy
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProxySettings"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Network]
+      summary: Clear proxy
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /devices/{serial}/logcat/snapshot:
+    get:
+      tags: [Logcat]
+      summary: Get logcat snapshot
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+        - name: lines
+          in: query
+          schema:
+            type: integer
+            default: 500
+      responses:
+        "200":
+          description: Logcat lines
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogcatResponse"
+
+  /devices/{serial}/logcat/clear:
+    post:
+      tags: [Logcat]
+      summary: Clear logcat buffer
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /devices/{serial}/shell:
+    post:
+      tags: [Shell]
+      summary: Execute shell command
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  maxLength: 4096
+      responses:
+        "200":
+          description: Command result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShellResponse"
+
+  /devices/{serial}/shell/script:
+    post:
+      tags: [Shell]
+      summary: Upload and execute script
+      parameters:
+        - $ref: "#/components/parameters/Serial"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                script:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Script results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptResponse"
+
+components:
+  parameters:
+    Serial:
+      name: serial
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-zA-Z0-9.:_-]+$"
+    PackageName:
+      name: packageName
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-zA-Z][a-zA-Z0-9_.]*$"
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+  schemas:
+    Device:
+      type: object
+      required: [serial, state, model, product, transportId]
+      properties:
+        serial:
+          type: string
+        state:
+          type: string
+          enum: [device, offline, unauthorized, no permissions]
+        model:
+          type: string
+        product:
+          type: string
+        transportId:
+          type: string
+
+    AppInfo:
+      type: object
+      properties:
+        packageName:
+          type: string
+        appName:
+          type: string
+        versionName:
+          type: string
+        type:
+          type: string
+          enum: [system, user, preinstalled]
+        sizeBytes:
+          type: integer
+        dataSizeBytes:
+          type: integer
+        cacheSizeBytes:
+          type: integer
+        iconBase64:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+
+    AppActionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        action:
+          type: string
+          enum: [uninstall, disable, force-stop]
+        message:
+          type: string
+
+    FileEntry:
+      type: object
+      properties:
+        path:
+          type: string
+        name:
+          type: string
+        sizeBytes:
+          type: integer
+        isDirectory:
+          type: boolean
+        modifiedAt:
+          type: string
+
+    StorageSummary:
+      type: object
+      properties:
+        totalBytes:
+          type: integer
+        usedBytes:
+          type: integer
+        freeBytes:
+          type: integer
+
+    WifiStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        ssid:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+
+    ProxySettings:
+      type: object
+      required: [host, port]
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        bypass:
+          type: string
+
+    LogcatLine:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        pid:
+          type: integer
+        tid:
+          type: integer
+        level:
+          type: string
+          enum: [V, D, I, W, E, F]
+        tag:
+          type: string
+        message:
+          type: string
+        raw:
+          type: string
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: integer
+
+    DeviceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Device"
+
+    DeviceResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Device"
+
+    AppListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppInfo"
+
+    AppActionResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/AppActionResult"
+
+    FileListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileEntry"
+
+    StorageResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/StorageSummary"
+
+    WifiResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/WifiStatus"
+
+    ProxyResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/ProxySettings"
+          nullable: true
+
+    LogcatResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogcatLine"
+
+    ShellResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            stdout:
+              type: string
+            stderr:
+              type: string
+            exitCode:
+              type: integer
+
+    ScriptResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            results:
+              type: array
+              items:
+                type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean

@@ -1,0 +1,9 @@
+node_modules
+.claude
+client/dist
+server/dist
+.env
+.DS_Store
+.idea
+.vscode
+client/node_modules

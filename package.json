@@ -1,0 +1,21 @@
+{
+  "name": "adb-master",
+  "version": "1.0.0",
+  "description": "Manage Android devices via ADB from a web interface",
+  "license": "ISC",
+  "author": "",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w server && npm run build -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

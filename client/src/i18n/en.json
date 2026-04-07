@@ -1,0 +1,142 @@
+{
+  "nav": {
+    "devices": "Devices",
+    "apps": "Applications",
+    "files": "Storage",
+    "network": "Network",
+    "logcat": "Logcat",
+    "terminal": "Terminal"
+  },
+  "header": {
+    "title": "ADB Master",
+    "selectDevice": "Select device",
+    "noDevice": "No device"
+  },
+  "devices": {
+    "title": "Connected Devices",
+    "noDevices": "No devices connected",
+    "state": {
+      "device": "Connected",
+      "offline": "Offline",
+      "unauthorized": "Unauthorized",
+      "no permissions": "No Permissions"
+    },
+    "instructions": {
+      "title": "How to Connect a Device",
+      "step1": "Go to Settings > About Phone > tap Build Number 7 times to enable Developer Options",
+      "step2": "Go to Settings > Developer Options > Enable USB Debugging",
+      "step3": "Connect your device via USB cable to this computer",
+      "step4": "Accept the USB debugging prompt on your device",
+      "stepWifi": "For wireless: run 'adb tcpip 5555' then 'adb connect <device-ip>:5555'"
+    }
+  },
+  "apps": {
+    "title": "Installed Applications",
+    "search": "Search apps...",
+    "filter": {
+      "all": "All",
+      "system": "System",
+      "user": "User",
+      "preinstalled": "Pre-installed"
+    },
+    "labels": {
+      "system": "System",
+      "user": "User",
+      "preinstalled": "Pre-installed"
+    },
+    "size": "Size",
+    "dataSize": "Data",
+    "cacheSize": "Cache",
+    "version": "Version",
+    "disabled": "Disabled",
+    "actions": {
+      "remove": "Remove",
+      "disable": "Disable",
+      "stop": "Force Stop"
+    },
+    "install": "Install APK",
+    "installing": "Installing...",
+    "confirmRemove": "Are you sure you want to remove {{appName}}?",
+    "confirmDisable": "Are you sure you want to disable {{appName}}?",
+    "loading": "Loading applications...",
+    "empty": "No applications found"
+  },
+  "files": {
+    "title": "Storage Manager",
+    "largeFiles": "Large Files",
+    "browse": "Browse Files",
+    "storage": "Storage Usage",
+    "total": "Total",
+    "used": "Used",
+    "free": "Free",
+    "path": "Path",
+    "name": "Name",
+    "size": "Size",
+    "modified": "Modified",
+    "delete": "Delete",
+    "download": "Download",
+    "upload": "Upload",
+    "uploading": "Uploading...",
+    "uploadFailed": "Failed to upload file",
+    "confirmDelete": "Delete {{name}}?",
+    "noFiles": "No files found",
+    "loading": "Scanning files..."
+  },
+  "network": {
+    "title": "Network Settings",
+    "wifi": {
+      "title": "WiFi",
+      "enabled": "WiFi Enabled",
+      "disabled": "WiFi Disabled",
+      "ssid": "Network",
+      "ip": "IP Address",
+      "toggle": "Toggle WiFi"
+    },
+    "proxy": {
+      "title": "Proxy Settings",
+      "host": "Host",
+      "port": "Port",
+      "bypass": "Bypass list",
+      "set": "Set Proxy",
+      "clear": "Clear Proxy",
+      "noProxy": "No proxy configured",
+      "current": "Current Proxy"
+    }
+  },
+  "logcat": {
+    "title": "Logcat Viewer",
+    "start": "Start",
+    "stop": "Stop",
+    "clear": "Clear",
+    "export": "Export",
+    "filter": {
+      "level": "Log Level",
+      "tag": "Tag",
+      "search": "Search...",
+      "all": "All Levels"
+    },
+    "empty": "No log entries. Press Start to begin streaming.",
+    "streaming": "Streaming...",
+    "paused": "Paused"
+  },
+  "terminal": {
+    "title": "ADB Shell",
+    "placeholder": "Type a command...",
+    "execute": "Execute",
+    "upload": "Upload Script",
+    "uploadHint": "Upload a .sh script file to execute",
+    "scriptResults": "Script Results",
+    "connected": "Shell connected",
+    "disconnected": "Shell disconnected"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "success": "Success",
+    "back": "Back"
+  }
+}
