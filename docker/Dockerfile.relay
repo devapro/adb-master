@@ -1,0 +1,31 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY relay/package.json relay/package-lock.json* ./
+RUN npm install
+
+COPY relay/tsconfig.json ./
+COPY relay/src ./src
+
+# Relay extends base tsconfig
+COPY tsconfig.base.json /tsconfig.base.json
+
+RUN npx tsc
+
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+COPY --from=builder /app/package.json ./
+RUN npm install --omit=dev
+
+COPY --from=builder /app/dist ./dist
+
+RUN addgroup -S relay && adduser -S relay -G relay
+USER relay
+
+EXPOSE 8080
+
+CMD ["node", "dist/index.js"]

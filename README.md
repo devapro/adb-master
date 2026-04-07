@@ -127,6 +127,33 @@ RELAY_URL=https://your-vps.com RELAY_PASSWORD=optional npm run dev:server
 #    Enter relay URL + session code → Connect
 ```
 
+### Docker Deployment
+
+Run the relay in Docker — no Node.js installation required.
+
+**Basic:**
+
+```bash
+cd docker && docker compose up -d
+```
+
+**With ngrok** (for home servers / Raspberry Pi — no VPS needed):
+
+```bash
+cd docker
+cp .env.example .env
+# Edit .env — set NGROK_AUTHTOKEN (get one at https://dashboard.ngrok.com)
+docker compose -f docker-compose.ngrok.yml up -d
+```
+
+Get the public ngrok URL:
+
+```bash
+curl -s http://localhost:4040/api/tunnels | jq '.tunnels[0].public_url'
+```
+
+Works on Raspberry Pi (arm64) out of the box. See [`docker/README.md`](./docker/README.md) for full details.
+
 Environment variables for relay:
 
 | Variable | Default | Description |

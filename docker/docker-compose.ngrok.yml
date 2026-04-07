@@ -1,0 +1,20 @@
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.relay
+    environment:
+      - RELAY_PORT=8080
+      - CORS_ORIGIN=*
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http relay:8080
+    ports:
+      - "4040:4040"
+    depends_on:
+      - relay
+    restart: unless-stopped
