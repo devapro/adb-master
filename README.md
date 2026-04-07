@@ -32,6 +32,8 @@ Web interface for managing Android devices via ADB. Control your device from a b
 ### Screen
 - **Screenshot Capture** — take screenshots, preview, and download as PNG
 - **Screen Recording** — start/stop recording with timer, download as MP4
+- **Live Screen Stream** — real-time device screen in the browser at 1–5 fps
+- **Interactive Control** — click to tap, drag to swipe, type to send text; Home/Back/Recents/Volume key bar
 
 ### Network
 - **WiFi Toggle** — enable/disable WiFi
@@ -73,6 +75,39 @@ Monorepo with npm workspaces: `server/`, `client/`, and `relay/`.
 
 - **Node.js** >= 18
 - **ADB** installed and on PATH (`adb version` should work)
+
+## Installation
+
+### One-liner (Mac or Linux)
+
+Installs git and Node.js if missing, clones the repo, and runs `npm install`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devapro/adb-master/main/install.sh | bash
+```
+
+Or download and inspect first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devapro/adb-master/main/install.sh -o install.sh
+bash install.sh
+```
+
+Then start:
+
+```bash
+cd adb-master
+npm run dev
+```
+
+### Manual
+
+```bash
+git clone https://github.com/devapro/adb-master.git
+cd adb-master
+npm install
+npm run dev
+```
 
 ## Quick Start
 
@@ -193,7 +228,7 @@ Key endpoints:
 | POST | `/api/devices/:serial/intent` | Send intent |
 | POST | `/api/devices/:serial/shell` | Execute command |
 
-Real-time events via Socket.IO namespaces: `/devices`, `/logcat`, `/shell`.
+Real-time events via Socket.IO namespaces: `/devices`, `/logcat`, `/shell`, `/screen`.
 
 ## Project Structure
 
