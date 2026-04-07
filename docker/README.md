@@ -1,18 +1,41 @@
-# Docker Deployment — ADB Master Relay
+# Docker Deployment — ADB Master
 
-## Basic Deployment
+## Quick Start (Linux with USB devices)
 
 ```bash
 cd docker
 docker compose up -d
 ```
 
-The relay server will be available at `http://localhost:8080`.
+Open `http://localhost:3000`. Android devices connected via USB will be detected automatically.
 
-To customize, create a `.env` file from the example:
+## macOS / Windows (Network ADB only)
+
+Docker on macOS/Windows cannot access USB devices. Use network ADB instead:
+
+1. On the Android device: enable **Wireless debugging** (Settings > Developer options)
+2. Start the container:
 
 ```bash
-cp .env.example .env
+cd docker
+docker compose -f docker-compose.network.yml up -d
+```
+
+3. Connect to the device from inside the container:
+
+```bash
+docker compose -f docker-compose.network.yml exec app adb connect <device-ip>:5555
+```
+
+4. Open `http://localhost:3000`
+
+## Relay Server Only
+
+To deploy just the relay (for remote access tunneling):
+
+```bash
+cd docker
+docker compose --profile relay up -d relay
 ```
 
 ## ngrok Deployment (Home Server / Raspberry Pi)
@@ -68,8 +91,10 @@ If you encounter architecture issues, add `platform: linux/arm64` to the service
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RELAY_PORT` | `8080` | Host port mapping (basic compose only) |
+| `PORT` | `3000` | App port |
+| `CORS_ORIGIN` | `*` | Allowed CORS origins |
+| `ADB_PATH` | `adb` | Path to adb binary |
+| `RELAY_PORT` | `8080` | Relay host port |
 | `MAX_SESSIONS` | `50` | Max concurrent relay sessions |
 | `SESSION_TIMEOUT` | `86400000` | Session expiry in ms (24h) |
-| `CORS_ORIGIN` | `*` | Allowed CORS origins |
 | `NGROK_AUTHTOKEN` | — | ngrok auth token (ngrok compose only) |

@@ -5,6 +5,9 @@
   "license": "ISC",
   "author": "",
   "private": true,
+  "bin": {
+    "adb-master": "./bin/adb-master.js"
+  },
   "workspaces": [
     "server",
     "client",
@@ -16,7 +19,8 @@
     "dev:client": "npm run dev -w client",
     "dev:relay": "npm -w relay run dev",
     "build": "npm run build -w server && npm run build -w client",
-    "build:relay": "npm -w relay run build"
+    "build:relay": "npm -w relay run build",
+    "start": "node bin/adb-master.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

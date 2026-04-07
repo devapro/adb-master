@@ -1,4 +1,21 @@
 services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - ADB_PATH=${ADB_PATH:-adb}
+    # USB passthrough for Android devices (Linux only)
+    # On macOS/Windows, use ADB over network: adb connect <device-ip>:5555
+    privileged: true
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+    restart: unless-stopped
+
   relay:
     build:
       context: ..
@@ -11,3 +28,5 @@ services:
       - SESSION_TIMEOUT=${SESSION_TIMEOUT:-86400000}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
     restart: unless-stopped
+    profiles:
+      - relay

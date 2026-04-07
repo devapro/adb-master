@@ -1,0 +1,13 @@
+## Use this on macOS/Windows where USB passthrough is not available.
+## Connect devices over network: adb connect <device-ip>:5555
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    restart: unless-stopped
