@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADB Master — Web Interface for Android Device Management</title>
+  <meta name="description" content="ADB Master is a free, open-source web interface for managing Android devices via ADB — locally or remotely. Features app management, file browser, live screen, logcat, shell, and more.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --bg-2: #161b22;
+      --bg-3: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-2: #3fb950;
+      --accent-danger: #f85149;
+      --accent-warn: #d29922;
+      --accent-purple: #bc8cff;
+      --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius: 8px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      font-family: var(--font-mono);
+      background: var(--bg-3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.875em;
+    }
+
+    pre {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.6;
+    }
+
+    /* ── Navigation ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 17, 23, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 58px;
+    }
+
+    .nav-logo {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-shrink: 0;
+    }
+
+    .logo-icon {
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-purple));
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 22px;
+      list-style: none;
+      margin-left: auto;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    .nav-github {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 14px;
+      color: var(--text) !important;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .nav-github:hover { background: var(--border); text-decoration: none !important; }
+
+    /* ── Container ── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 88px 24px 72px;
+      text-align: center;
+      background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(88, 166, 255, 0.07) 0%, transparent 70%);
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(63, 185, 80, 0.1);
+      border: 1px solid rgba(63, 185, 80, 0.3);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.8rem;
+      color: var(--accent-2);
+      margin-bottom: 28px;
+      font-weight: 500;
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 0 auto 40px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 44px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1117;
+      font-weight: 700;
+      padding: 13px 26px;
+      border-radius: var(--radius);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      transition: opacity 0.15s;
+    }
+
+    .btn-primary:hover { opacity: 0.85; text-decoration: none; }
+
+    .btn-secondary {
+      background: var(--bg-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 13px 26px;
+      border-radius: var(--radius);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+
+    .btn-secondary:hover { background: var(--bg-3); text-decoration: none; }
+
+    .hero-install {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      max-width: 100%;
+      overflow-x: auto;
+      text-align: left;
+    }
+
+    .hero-install .cmd { color: var(--accent-2); font-weight: 700; }
+    .hero-install .str { color: var(--accent); }
+
+    /* ── Section chrome ── */
+    section { padding: 72px 0; }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: clamp(1.5rem, 3vw, 2.2rem);
+      font-weight: 700;
+      margin-bottom: 14px;
+      letter-spacing: -0.01em;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      max-width: 580px;
+      font-size: 1rem;
+    }
+
+    /* ── Screenshots / Mockups ── */
+    .screenshots {
+      background: var(--bg-2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+
+    .mockup-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .mockup-bar {
+      background: var(--bg-3);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      user-select: none;
+    }
+
+    .mockup-dots { display: flex; gap: 5px; margin-right: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+
+    .mockup-body { padding: 16px; min-height: 220px; }
+
+    /* Device list mockup */
+    .device-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      margin-bottom: 8px;
+    }
+
+    .device-icon {
+      width: 34px;
+      height: 42px;
+      border: 2.5px solid var(--accent);
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .device-icon::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      width: 10px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .device-name { font-weight: 600; font-size: 0.875rem; }
+    .device-serial { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+
+    .badge-online {
+      background: rgba(63, 185, 80, 0.12);
+      color: var(--accent-2);
+      border: 1px solid rgba(63, 185, 80, 0.3);
+      border-radius: 12px;
+      padding: 2px 9px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    .badge-wifi {
+      background: rgba(88, 166, 255, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 12px;
+      padding: 2px 9px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* App list mockup */
+    .app-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 3px;
+    }
+
+    .app-icon-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .app-info { flex: 1; min-width: 0; }
+    .app-name { font-size: 0.84rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .app-pkg { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
+    .app-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .mini-btn {
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      cursor: default;
+      white-space: nowrap;
+    }
+
+    /* Logcat mockup */
+    .log-line {
+      display: flex;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.71rem;
+      padding: 2px 0;
+      line-height: 1.5;
+    }
+
+    .log-level { width: 14px; text-align: center; font-weight: 700; flex-shrink: 0; }
+    .log-tag { width: 90px; flex-shrink: 0; overflow: hidden; color: var(--text-muted); font-size: 0.68rem; }
+    .log-msg { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lv-d { color: var(--text-muted); }
+    .lv-i { color: var(--accent); }
+    .lv-w { color: var(--accent-warn); }
+    .lv-e { color: var(--accent-danger); }
+
+    /* Phone / screen mockup */
+    .phone-frame {
+      width: 118px;
+      height: 202px;
+      border: 3px solid var(--border);
+      border-radius: 15px;
+      margin: 0 auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .phone-screen-content {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, #1a237e 0%, #283593 50%, #1565c0 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: 28px;
+      gap: 4px;
+    }
+
+    .phone-clock { font-size: 1.5rem; font-weight: 200; color: white; letter-spacing: 0.05em; }
+    .phone-date { font-size: 0.5rem; color: rgba(255,255,255,0.65); }
+
+    .phone-apps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      padding: 0 10px;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .phone-app { width: 18px; height: 18px; border-radius: 4px; margin: 0 auto; }
+
+    .screen-controls {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* File manager mockup */
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .file-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+    .file-name { flex: 1; font-family: var(--font-mono); font-size: 0.76rem; }
+    .file-size { font-size: 0.68rem; color: var(--text-muted); flex-shrink: 0; }
+
+    /* Device info mockup */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .info-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .info-label { font-size: 0.67rem; color: var(--text-muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .info-value { font-size: 0.88rem; font-weight: 600; }
+    .info-value.green { color: var(--accent-2); }
+    .info-value.blue { color: var(--accent); }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--bg-3);
+      border-radius: 2px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .progress-fill { height: 100%; border-radius: 2px; }
+
+    /* ── Features ── */
+    .features { border-top: 1px solid var(--border); }
+
+    .features-header { margin-bottom: 48px; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+
+    .feature-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(88, 166, 255, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .feature-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    .fi-blue   { background: rgba(88, 166, 255, 0.1); }
+    .fi-green  { background: rgba(63, 185, 80, 0.1); }
+    .fi-purple { background: rgba(188, 140, 255, 0.1); }
+    .fi-orange { background: rgba(210, 153, 34, 0.1); }
+    .fi-red    { background: rgba(248, 81, 73, 0.1); }
+    .fi-cyan   { background: rgba(88, 212, 255, 0.1); }
+
+    .feature-title { font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+
+    .feature-list { list-style: none; color: var(--text-muted); font-size: 0.855rem; }
+
+    .feature-list li {
+      padding: 3px 0;
+      display: flex;
+      gap: 7px;
+      align-items: baseline;
+    }
+
+    .feature-list li::before { content: '→'; color: var(--accent); flex-shrink: 0; }
+
+    /* ── Use Cases ── */
+    .use-cases {
+      background: var(--bg-2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .cases-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+
+    .case-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+
+    .case-card:hover { border-color: rgba(88, 166, 255, 0.4); }
+
+    .case-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .case-emoji { font-size: 2rem; flex-shrink: 0; }
+
+    .case-title { font-size: 1rem; font-weight: 600; margin-bottom: 2px; }
+    .case-tag {
+      font-size: 0.72rem;
+      color: var(--accent);
+      background: rgba(88, 166, 255, 0.1);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 10px;
+      padding: 1px 8px;
+      font-weight: 500;
+    }
+
+    .case-desc {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-bottom: 16px;
+      line-height: 1.55;
+    }
+
+    .case-steps { list-style: none; font-size: 0.845rem; }
+
+    .case-steps li {
+      display: flex;
+      gap: 10px;
+      padding: 4px 0;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(88, 166, 255, 0.12);
+      color: var(--accent);
+      font-size: 0.68rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── Comparison ── */
+    .comparison { border-top: 1px solid var(--border); }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 48px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+      min-width: 700px;
+    }
+
+    .comparison-table th {
+      background: var(--bg-2);
+      padding: 13px 16px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+      color: var(--text-muted);
+    }
+
+    .comparison-table th.col-us {
+      color: var(--accent);
+      background: rgba(88, 166, 255, 0.06);
+    }
+
+    .comparison-table td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .comparison-table tr:last-child td { border-bottom: none; }
+
+    .comparison-table td.col-us { background: rgba(88, 166, 255, 0.03); }
+
+    .comparison-table tr:hover td { background: var(--bg-2); }
+    .comparison-table tr:hover td.col-us { background: rgba(88, 166, 255, 0.06); }
+
+    .row-label { font-weight: 500; }
+
+    .chk  { color: var(--accent-2);  font-weight: 700; }
+    .crs  { color: var(--text-muted); opacity: 0.5; }
+    .prt  { color: var(--accent-warn); }
+
+    .table-legend {
+      margin-top: 12px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Getting Started ── */
+    .getting-started {
+      background: var(--bg-2);
+      border-top: 1px solid var(--border);
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin: 48px 0;
+    }
+
+    .step-card {
+      padding: 24px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .step-number {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .step-title { font-weight: 600; margin-bottom: 8px; font-size: 0.95rem; }
+    .step-desc { color: var(--text-muted); font-size: 0.855rem; line-height: 1.5; }
+
+    .install-block { margin-top: 32px; }
+    .install-block-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .connect-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      max-width: 820px;
+      margin-top: 32px;
+    }
+
+    .connect-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .connect-card h4 { font-size: 0.9rem; margin-bottom: 10px; }
+
+    .connect-card ol {
+      color: var(--text-muted);
+      font-size: 0.855rem;
+      padding-left: 20px;
+      line-height: 2;
+    }
+
+    /* ── Remote Access ── */
+    .remote-section { border-top: 1px solid var(--border); }
+
+    .remote-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin: 48px 0 36px;
+    }
+
+    .diagram-node {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 22px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .diagram-node.accent-border { border-color: rgba(88, 166, 255, 0.5); }
+
+    .diagram-icon { font-size: 1.8rem; margin-bottom: 6px; }
+    .diagram-label { font-size: 0.8rem; font-weight: 600; }
+    .diagram-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+
+    .diagram-arrow {
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .diagram-arrow .arr-label { font-size: 0.62rem; color: var(--accent); white-space: nowrap; }
+
+    .relay-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .relay-step {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .relay-step-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .relay-step p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .footer-inner {
+      max-width: 600px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .footer-logo { font-weight: 700; font-size: 1.1rem; color: var(--text); }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-links a { color: var(--text-muted); transition: color 0.15s; }
+    .footer-links a:hover { color: var(--accent); text-decoration: none; }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .nav-links { display: none; }
+      .hero { padding: 52px 16px 44px; }
+      .container { padding: 0 16px; }
+      section { padding: 52px 0; }
+      .relay-steps { grid-template-columns: 1fr; }
+      .connect-grid { grid-template-columns: 1fr; }
+      .hero-install { font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── Navigation ─── -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <div class="logo-icon">📱</div>
+      ADB Master
+    </div>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#use-cases">Use Cases</a></li>
+      <li><a href="#comparison">Comparison</a></li>
+      <li><a href="#getting-started">Get Started</a></li>
+      <li><a href="#remote">Remote Access</a></li>
+    </ul>
+    <a class="nav-github" href="https://github.com/devapro/adb-master" target="_blank" rel="noopener">
+      ★ GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- ─── Hero ─── -->
+<div class="hero">
+  <div class="hero-badge">✦ Free &amp; Open Source</div>
+  <h1>Android Device Management<br><span class="gradient">in Your Browser</span></h1>
+  <p class="hero-subtitle">
+    A full-featured web interface for managing Android devices via ADB.
+    Apps, files, screen, logs, shell — all in one place, locally or remotely.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="#getting-started">→ Get Started</a>
+    <a class="btn-secondary" href="https://github.com/devapro/adb-master" target="_blank" rel="noopener">View on GitHub</a>
+  </div>
+  <div class="hero-install">
+    <span class="cmd">$</span>
+    <span>git clone https://github.com/devapro/adb-master.git &amp;&amp; cd adb-master &amp;&amp; npm install &amp;&amp; npm run dev</span>
+  </div>
+</div>
+
+<!-- ─── UI Mockups ─── -->
+<section class="screenshots" id="screenshots">
+  <div class="container">
+    <div class="section-label">Interface Preview</div>
+    <h2 class="section-title">Everything in one place</h2>
+    <p class="section-desc">Manage apps, files, logs, screen, and system settings from a clean browser dashboard.</p>
+
+    <div class="mockup-grid">
+
+      <!-- Devices Page -->
+      <div class="mockup-card">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          </div>
+          ADB Master — Devices
+        </div>
+        <div class="mockup-body">
+          <div class="device-item">
+            <div class="device-icon">📱</div>
+            <div>
+              <div class="device-name">Pixel 7 Pro</div>
+              <div class="device-serial">R3CX10ABCDE · Android 14</div>
+            </div>
+            <div class="badge-online">● USB</div>
+          </div>
+          <div class="device-item">
+            <div class="device-icon">📱</div>
+            <div>
+              <div class="device-name">Samsung Galaxy S23</div>
+              <div class="device-serial">192.168.1.42:5555 · Android 13</div>
+            </div>
+            <div class="badge-wifi">⌾ WiFi</div>
+          </div>
+          <div style="margin-top:14px; display:flex; gap:8px;">
+            <div class="mini-btn" style="padding:6px 12px; font-size:0.78rem; color:var(--accent);">+ Connect WiFi</div>
+            <div class="mini-btn" style="padding:6px 12px; font-size:0.78rem;">↑ Install APK</div>
+            <div class="mini-btn" style="padding:6px 12px; font-size:0.78rem;">↺ Reboot</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- App Manager -->
+      <div class="mockup-card">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          </div>
+          App Manager
+        </div>
+        <div class="mockup-body">
+          <div style="display:flex; gap:6px; margin-bottom:10px;">
+            <div class="mini-btn" style="color:var(--accent)">All</div>
+            <div class="mini-btn">User</div>
+            <div class="mini-btn">System</div>
+            <div style="flex:1; background:var(--bg-3); border:1px solid var(--border); border-radius:4px; padding:2px 8px; font-size:0.72rem; color:var(--text-muted);">Search apps...</div>
+          </div>
+          <div class="app-row">
+            <div class="app-icon-box" style="background:#e3f2fd;">🎵</div>
+            <div class="app-info">
+              <div class="app-name">Spotify</div>
+              <div class="app-pkg">com.spotify.music · 124 MB</div>
+            </div>
+            <div class="app-actions">
+              <div class="mini-btn">Stop</div>
+              <div class="mini-btn" style="color:var(--accent-danger)">Remove</div>
+            </div>
+          </div>
+          <div class="app-row">
+            <div class="app-icon-box" style="background:#e8f5e9;">🗺️</div>
+            <div class="app-info">
+              <div class="app-name">Google Maps</div>
+              <div class="app-pkg">com.google.android.apps.maps</div>
+            </div>
+            <div class="app-actions">
+              <div class="mini-btn">APK</div>
+              <div class="mini-btn">Perms</div>
+            </div>
+          </div>
+          <div class="app-row">
+            <div class="app-icon-box" style="background:#fce4ec;">📷</div>
+            <div class="app-info">
+              <div class="app-name">Camera</div>
+              <div class="app-pkg">com.android.camera2</div>
+            </div>
+            <div class="app-actions">
+              <div class="mini-btn">Launch</div>
+              <div class="mini-btn">Clear</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen & Control -->
+      <div class="mockup-card">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          </div>
+          Screen &amp; Interactive Control
+        </div>
+        <div class="mockup-body" style="display:flex; flex-direction:column; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px; align-self:flex-start; margin-bottom:10px;">
+            <div class="mini-btn" style="color:var(--accent-2); border-color:rgba(63,185,80,0.4);">● Live 3 fps</div>
+            <div class="mini-btn">📸 Screenshot</div>
+            <div class="mini-btn" style="color:var(--accent-danger);">⏺ Record</div>
+          </div>
+          <div class="phone-frame">
+            <div class="phone-screen-content">
+              <div class="phone-clock">14:32</div>
+              <div class="phone-date">Tuesday, April 8</div>
+              <div class="phone-apps">
+                <div class="phone-app" style="background:#4285f4;"></div>
+                <div class="phone-app" style="background:#ea4335;"></div>
+                <div class="phone-app" style="background:#34a853;"></div>
+                <div class="phone-app" style="background:#fbbc04;"></div>
+                <div class="phone-app" style="background:#ff5722;"></div>
+                <div class="phone-app" style="background:#9c27b0;"></div>
+                <div class="phone-app" style="background:#00bcd4;"></div>
+                <div class="phone-app" style="background:#607d8b;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="screen-controls">
+            <div class="mini-btn">◀ Back</div>
+            <div class="mini-btn">⌂ Home</div>
+            <div class="mini-btn">▭ Recent</div>
+            <div class="mini-btn">Vol +</div>
+            <div class="mini-btn">Vol −</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logcat -->
+      <div class="mockup-card">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          </div>
+          Logcat Viewer
+        </div>
+        <div class="mockup-body" style="padding:12px;">
+          <div style="margin-bottom:8px; display:flex; gap:5px; flex-wrap:wrap;">
+            <div class="mini-btn lv-d">V</div>
+            <div class="mini-btn lv-i">I</div>
+            <div class="mini-btn lv-w">W</div>
+            <div class="mini-btn lv-e">E</div>
+            <div style="flex:1; min-width:100px; background:var(--bg-3); border:1px solid var(--border); border-radius:4px; padding:2px 8px; font-size:0.7rem; color:var(--text-muted);">Filter by tag...</div>
+          </div>
+          <div class="log-line"><span class="log-level lv-i">I</span><span class="log-tag">ActivityManager</span><span class="log-msg">Start proc com.myapp for activity</span></div>
+          <div class="log-line"><span class="log-level lv-d">D</span><span class="log-tag">NetworkManager</span><span class="log-msg">Connected to WiFi: HomeNetwork</span></div>
+          <div class="log-line"><span class="log-level lv-w">W</span><span class="log-tag">BatteryStats</span><span class="log-msg">Battery low: 15% remaining</span></div>
+          <div class="log-line"><span class="log-level lv-e">E</span><span class="log-tag">AndroidRuntime</span><span class="log-msg" style="color:var(--accent-danger)">FATAL: NullPointerException in main</span></div>
+          <div class="log-line"><span class="log-level lv-i">I</span><span class="log-tag">System.out</span><span class="log-msg">Application onCreate() complete</span></div>
+          <div class="log-line"><span class="log-level lv-d">D</span><span class="log-tag">ViewRootImpl</span><span class="log-msg">Surface created for DecorView</span></div>
+          <div class="log-line"><span class="log-level lv-w">W</span><span class="log-tag">SQLiteLog</span><span class="log-msg">(28) file unlinked while open</span></div>
+        </div>
+      </div>
+
+      <!-- File Manager -->
+      <div class="mockup-card">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          </div>
+          File Manager · /sdcard/
+        </div>
+        <div class="mockup-body">
+          <div style="background:var(--bg-2); border:1px solid var(--border); border-radius:4px; padding:5px 10px; font-family:var(--font-mono); font-size:0.73rem; color:var(--text-muted); margin-bottom:10px;">/sdcard/</div>
+          <div class="file-row"><span class="file-icon">📁</span><span class="file-name">DCIM/</span><span class="file-size">—</span></div>
+          <div class="file-row"><span class="file-icon">📁</span><span class="file-name">Download/</span><span class="file-size">—</span></div>
+          <div class="file-row"><span class="file-icon">📁</span><span class="file-name">Android/data/</span><span class="file-size">—</span></div>
+          <div class="file-row"><span class="file-icon">🎵</span><span class="file-name">voice_note.m4a</span><span class="file-size">2.3 MB</span></div>
+          <div class="file-row"><span class="file-icon">📄</span><span class="file-name">notes.txt</span><span class="file-size">4 KB</span></div>
+          <div style="margin-top:10px; display:flex; gap:6px;">
+            <div class="mini-btn" style="padding:5px 10px; font-size:0.77rem; color:var(--accent);">↑ Upload</div>
+            <div class="mini-btn" style="padding:5px 10px; font-size:0.77rem;">🔍 Large Files</div>
+            <div class="mini-btn" style="padding:5px 10px; font-size:0.77rem;">Storage</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Device Info -->
+      <div class="mockup-card">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          </div>
+          Device Info
+        </div>
+        <div class="mockup-body">
+          <div class="info-grid">
+            <div class="info-card">
+              <div class="info-label">Model</div>
+              <div class="info-value">Pixel 7 Pro</div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">Android</div>
+              <div class="info-value blue">14 · API 34</div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">Battery</div>
+              <div class="info-value green">87% ⚡</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:87%; background:var(--accent-2);"></div></div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">RAM</div>
+              <div class="info-value">4.2 / 12 GB</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:35%; background:var(--accent);"></div></div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">Screen</div>
+              <div class="info-value">1440 × 3120</div>
+            </div>
+            <div class="info-card">
+              <div class="info-label">CPU</div>
+              <div class="info-value">Tensor G2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── Features ─── -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="features-header">
+      <div class="section-label">Capabilities</div>
+      <h2 class="section-title">Everything ADB can do, in a UI</h2>
+      <p class="section-desc">10 feature-rich pages covering the full scope of Android device management — no command line needed.</p>
+    </div>
+
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon fi-blue">📱</div>
+        <div class="feature-title">Device Management</div>
+        <ul class="feature-list">
+          <li>Real-time device list with connection status</li>
+          <li>Wireless ADB connect / disconnect</li>
+          <li>Multi-device bulk actions &amp; APK install</li>
+          <li>Reboot to system / recovery / bootloader</li>
+          <li>Bugreport capture and download</li>
+        </ul>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon fi-green">📦</div>
+        <div class="feature-title">App Management</div>
+        <ul class="feature-list">
+          <li>Browse user, system &amp; preinstalled apps</li>
+          <li>Install APK with drag-and-drop + progress</li>
+          <li>Uninstall, disable, force stop, launch apps</li>
+          <li>Grant / revoke runtime permissions</li>
+          <li>Extract APK · Backup &amp; restore app data</li>
+        </ul>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon fi-purple">📂</div>
+        <div class="feature-title">File Manager</div>
+        <ul class="feature-list">
+          <li>Browse the full device filesystem</li>
+          <li>Upload files from PC to device</li>
+          <li>Download any file to your computer</li>
+          <li>Find and remove files larger than 1 MB</li>
+          <li>Visual storage usage breakdown</li>
+        </ul>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon fi-orange">🖥️</div>
+        <div class="feature-title">Screen &amp; Control</div>
+        <ul class="feature-list">
+          <li>Live screen stream at 1–5 fps in browser</li>
+          <li>Click to tap · drag to swipe on the canvas</li>
+          <li>Screenshot (PNG) &amp; screen recording (MP4)</li>
+          <li>Type text directly to device remotely</li>
+          <li>Home / Back / Recents / Volume / Power keys</li>
+        </ul>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon fi-red">📋</div>
+        <div class="feature-title">Logs &amp; Shell</div>
+        <ul class="feature-list">
+          <li>Real-time logcat with level &amp; tag filters</li>
+          <li>Save and load logcat filter presets</li>
+          <li>Interactive ADB shell with xterm.js</li>
+          <li>Upload and run shell scripts</li>
+          <li>Command history navigation</li>
+        </ul>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon fi-cyan">🌐</div>
+        <div class="feature-title">Network &amp; System</div>
+        <ul class="feature-list">
+          <li>WiFi toggle and status monitoring</li>
+          <li>HTTP proxy configuration</li>
+          <li>Port forwarding &amp; reverse mapping UI</li>
+          <li>System / secure / global settings editor</li>
+          <li>Intent launcher with extras support</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── Use Cases ─── -->
+<section class="use-cases" id="use-cases">
+  <div class="container">
+    <div class="section-label">Use Cases</div>
+    <h2 class="section-title">Built for every workflow</h2>
+    <p class="section-desc">From QA engineers to hobbyists — ADB Master fits into any Android workflow.</p>
+
+    <div class="cases-grid">
+
+      <div class="case-card">
+        <div class="case-header">
+          <div class="case-emoji">🧪</div>
+          <div>
+            <div class="case-title">QA &amp; Test Automation</div>
+            <div class="case-tag">quality engineers</div>
+          </div>
+        </div>
+        <p class="case-desc">Streamline your testing workflow — install builds, capture evidence, and debug failures without touching the command line.</p>
+        <ul class="case-steps">
+          <li><span class="step-num">1</span>Install latest APK from CI artifact storage</li>
+          <li><span class="step-num">2</span>Stream live screen while running test scenarios</li>
+          <li><span class="step-num">3</span>Capture screenshots and MP4 recordings as evidence</li>
+          <li><span class="step-num">4</span>Filter logcat by app tag to spot crashes instantly</li>
+          <li><span class="step-num">5</span>Download bugreport on failure and attach to ticket</li>
+        </ul>
+      </div>
+
+      <div class="case-card">
+        <div class="case-header">
+          <div class="case-emoji">👨‍💻</div>
+          <div>
+            <div class="case-title">Android Development</div>
+            <div class="case-tag">app developers</div>
+          </div>
+        </div>
+        <p class="case-desc">Keep ADB Master open alongside your IDE for a fast feedback loop while building and testing Android apps.</p>
+        <ul class="case-steps">
+          <li><span class="step-num">1</span>Monitor crash logs in real-time with tag filters</li>
+          <li><span class="step-num">2</span>Send deep links and test intents via Intent Launcher</li>
+          <li><span class="step-num">3</span>Inspect and tweak system settings (animations, density)</li>
+          <li><span class="step-num">4</span>Manage port forwards to local backend dev servers</li>
+          <li><span class="step-num">5</span>Clear app data instantly and re-test onboarding flows</li>
+        </ul>
+      </div>
+
+      <div class="case-card">
+        <div class="case-header">
+          <div class="case-emoji">🆘</div>
+          <div>
+            <div class="case-title">Remote Device Support</div>
+            <div class="case-tag">support engineers</div>
+          </div>
+        </div>
+        <p class="case-desc">Help users debug Android devices remotely — share a session link, connect over the internet, no physical access needed.</p>
+        <ul class="case-steps">
+          <li><span class="step-num">1</span>Start relay server on VPS or via ngrok on home PC</li>
+          <li><span class="step-num">2</span>Share session URL and optional password with the user</li>
+          <li><span class="step-num">3</span>View live device screen and interact remotely</li>
+          <li><span class="step-num">4</span>Inspect logs, installed apps, and system settings</li>
+          <li><span class="step-num">5</span>Push a fixed APK directly to their device</li>
+        </ul>
+      </div>
+
+      <div class="case-card">
+        <div class="case-header">
+          <div class="case-emoji">🏭</div>
+          <div>
+            <div class="case-title">Device Fleet Provisioning</div>
+            <div class="case-tag">fleet managers</div>
+          </div>
+        </div>
+        <p class="case-desc">Configure and provision multiple Android devices simultaneously — perfect for kiosks, test labs, or enterprise rollouts.</p>
+        <ul class="case-steps">
+          <li><span class="step-num">1</span>Connect all devices via USB hub or WiFi ADB</li>
+          <li><span class="step-num">2</span>Select all and bulk install the company APK</li>
+          <li><span class="step-num">3</span>Run shell scripts to apply uniform device settings</li>
+          <li><span class="step-num">4</span>Grant required permissions on all devices at once</li>
+          <li><span class="step-num">5</span>Verify each device via the Device Info dashboard</li>
+        </ul>
+      </div>
+
+      <div class="case-card">
+        <div class="case-header">
+          <div class="case-emoji">🍓</div>
+          <div>
+            <div class="case-title">Raspberry Pi Home Server</div>
+            <div class="case-tag">tinkerers &amp; hobbyists</div>
+          </div>
+        </div>
+        <p class="case-desc">Run ADB Master headlessly on a Raspberry Pi with your Android device always attached — manage it from any browser, worldwide.</p>
+        <ul class="case-steps">
+          <li><span class="step-num">1</span>Install Node.js and ADB on the Pi (arm64 supported)</li>
+          <li><span class="step-num">2</span>Connect Android device via USB to the Pi</li>
+          <li><span class="step-num">3</span>Run the relay with ngrok for a public HTTPS tunnel</li>
+          <li><span class="step-num">4</span>Access your device from any browser, anywhere</li>
+          <li><span class="step-num">5</span>Automate maintenance tasks with scheduled shell scripts</li>
+        </ul>
+      </div>
+
+      <div class="case-card">
+        <div class="case-header">
+          <div class="case-emoji">⚙️</div>
+          <div>
+            <div class="case-title">CI/CD Pipeline Integration</div>
+            <div class="case-tag">DevOps engineers</div>
+          </div>
+        </div>
+        <p class="case-desc">Use the full REST API to integrate Android device management directly into your continuous integration pipeline.</p>
+        <ul class="case-steps">
+          <li><span class="step-num">1</span>Start ADB Master server as a CI service step</li>
+          <li><span class="step-num">2</span><code>POST /api/devices/:id/apps/install</code> to deploy build</li>
+          <li><span class="step-num">3</span>Subscribe to Socket.IO <code>/logcat</code> during test run</li>
+          <li><span class="step-num">4</span><code>GET /api/devices/:id/screen/capture</code> for screenshots</li>
+          <li><span class="step-num">5</span><code>GET /api/devices/:id/bugreport</code> as CI artifact on fail</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─── Comparison ─── -->
+<section class="comparison" id="comparison">
+  <div class="container">
+    <div class="section-label">Comparison</div>
+    <h2 class="section-title">How does it compare?</h2>
+    <p class="section-desc">ADB Master consolidates features that are otherwise scattered across multiple paid and CLI-only tools into a single free, browser-based interface.</p>
+
+    <div class="table-wrap">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th style="min-width:200px;">Feature</th>
+            <th class="col-us">ADB Master</th>
+            <th>scrcpy</th>
+            <th>Android Studio</th>
+            <th>Vysor</th>
+            <th>adbLink</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="row-label">Price</td>
+            <td class="col-us" style="color:var(--accent-2); font-weight:600;">Free &amp; open source</td>
+            <td>Free &amp; open source</td>
+            <td>Free</td>
+            <td>Freemium (paid for HD / remote)</td>
+            <td>$4.99+ one-time</td>
+          </tr>
+          <tr>
+            <td class="row-label">Interface</td>
+            <td class="col-us" style="color:var(--accent); font-weight:500;">Web browser</td>
+            <td>Native app / CLI</td>
+            <td>Desktop IDE (4–8 GB)</td>
+            <td>Desktop / browser (paid)</td>
+            <td>Desktop app</td>
+          </tr>
+          <tr>
+            <td class="row-label">No client installation needed</td>
+            <td class="col-us"><span class="chk">✓</span> Just Node.js + ADB</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Remote access over internet</td>
+            <td class="col-us"><span class="chk">✓</span> Built-in relay server</td>
+            <td><span class="prt">~</span> Manual SSH tunnel</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="chk">✓</span> Paid plan only</td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Live screen view</td>
+            <td class="col-us"><span class="chk">✓</span> 1–5 fps streaming</td>
+            <td><span class="chk">✓</span> 60+ fps (fastest)</td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="prt">~</span> Limited</td>
+          </tr>
+          <tr>
+            <td class="row-label">Interactive screen control</td>
+            <td class="col-us"><span class="chk">✓</span> Click, swipe, type, keys</td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="prt">~</span></td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Screen recording</td>
+            <td class="col-us"><span class="chk">✓</span> MP4 download</td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="prt">~</span> Paid</td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Full app management</td>
+            <td class="col-us"><span class="chk">✓</span> Install/uninstall/disable/backup</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="prt">~</span> Basic</td>
+            <td><span class="prt">~</span> Basic</td>
+            <td><span class="chk">✓</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Permission management</td>
+            <td class="col-us"><span class="chk">✓</span> Grant / revoke per permission</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="prt">~</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">File manager</td>
+            <td class="col-us"><span class="chk">✓</span> Upload / download / delete</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="prt">~</span> Device File Explorer</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="chk">✓</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Logcat viewer</td>
+            <td class="col-us"><span class="chk">✓</span> Real-time + filters + presets</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="prt">~</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">ADB shell terminal</td>
+            <td class="col-us"><span class="chk">✓</span> xterm.js in browser</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="chk">✓</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Port forwarding UI</td>
+            <td class="col-us"><span class="chk">✓</span> Forward + reverse</td>
+            <td><span class="prt">~</span> CLI flag only</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="prt">~</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">REST API for automation</td>
+            <td class="col-us"><span class="chk">✓</span> Full OpenAPI 3.0 spec</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Docker / Raspberry Pi support</td>
+            <td class="col-us"><span class="chk">✓</span> arm64 Docker images</td>
+            <td><span class="prt">~</span> Possible manually</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+          <tr>
+            <td class="row-label">Multi-language UI</td>
+            <td class="col-us"><span class="chk">✓</span> English &amp; Russian (extendable)</td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="chk">✓</span></td>
+            <td><span class="crs">✗</span></td>
+            <td><span class="crs">✗</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-legend"><span class="chk">✓</span> Fully supported &nbsp;·&nbsp; <span class="prt">~</span> Partial / limited &nbsp;·&nbsp; <span class="crs">✗</span> Not supported</p>
+  </div>
+</section>
+
+<!-- ─── Getting Started ─── -->
+<section class="getting-started" id="getting-started">
+  <div class="container">
+    <div class="section-label">Installation</div>
+    <h2 class="section-title">Get started in minutes</h2>
+    <p class="section-desc">Node.js ≥ 18 and ADB are the only requirements. No native apps, no heavy IDEs.</p>
+
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <div class="step-title">Install prerequisites</div>
+        <p class="step-desc">Make sure Node.js ≥ 18 and ADB are installed and available on your PATH.</p>
+        <pre style="margin-top:12px; font-size:0.78rem;">node --version  # ≥ 18
+adb version</pre>
+      </div>
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <div class="step-title">Clone &amp; install</div>
+        <p class="step-desc">Clone the repo and install all workspace dependencies with a single command.</p>
+        <pre style="margin-top:12px; font-size:0.78rem;">git clone https://github.com/devapro/adb-master.git
+cd adb-master
+npm install</pre>
+      </div>
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <div class="step-title">Enable USB Debugging</div>
+        <p class="step-desc">On Android: <strong>Settings → About Phone</strong> → tap <strong>Build Number</strong> 7 times → go back → enable <strong>USB Debugging</strong> in Developer Options.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-number">4</div>
+        <div class="step-title">Start &amp; open</div>
+        <p class="step-desc">Run the dev command — it starts both server and client. Open your browser.</p>
+        <pre style="margin-top:12px; font-size:0.78rem;">npm run dev
+# Open http://localhost:5173</pre>
+      </div>
+    </div>
+
+    <div class="install-block">
+      <div class="install-block-label">One-liner (macOS / Linux)</div>
+      <pre>curl -fsSL https://raw.githubusercontent.com/devapro/adb-master/main/install.sh | bash
+cd adb-master && npm run dev</pre>
+    </div>
+
+    <div class="install-block">
+      <div class="install-block-label">Docker</div>
+      <pre>cd docker && docker compose up -d
+# Server on http://localhost:3000</pre>
+
+      <div style="margin-top:14px;">
+        <div style="font-size:0.85rem; font-weight:600; margin-bottom:8px; color:var(--text-muted);">With ngrok — home server or Raspberry Pi (arm64)</div>
+        <pre>cd docker
+cp .env.example .env          # set NGROK_AUTHTOKEN
+docker compose -f docker-compose.ngrok.yml up -d</pre>
+      </div>
+    </div>
+
+    <div class="install-block">
+      <div class="install-block-label">Connect your device</div>
+      <div class="connect-grid">
+        <div class="connect-card">
+          <h4>USB (simplest)</h4>
+          <ol>
+            <li>Connect device with a USB cable</li>
+            <li>Accept the "Allow USB Debugging" prompt on device</li>
+            <li>Device appears in the Devices page automatically</li>
+          </ol>
+        </div>
+        <div class="connect-card">
+          <h4>Wireless ADB</h4>
+          <pre style="font-size:0.76rem; margin-top:6px;">adb tcpip 5555
+adb connect &lt;device-ip&gt;:5555</pre>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px;">Or use the "Connect WiFi" button directly in the Devices page — no terminal needed.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── Remote Access ─── -->
+<section class="remote-section" id="remote">
+  <div class="container">
+    <div class="section-label">Remote Access</div>
+    <h2 class="section-title">Manage devices from anywhere</h2>
+    <p class="section-desc">The built-in relay server bridges your browser to a local ADB server over the internet — no VPN, no port forwarding on the target device.</p>
+
+    <div class="remote-diagram">
+      <div class="diagram-node">
+        <div class="diagram-icon">🌐</div>
+        <div class="diagram-label">Your Browser</div>
+        <div class="diagram-sub">Any location</div>
+      </div>
+      <div class="diagram-arrow">
+        ⟷
+        <span class="arr-label">HTTPS / WSS</span>
+      </div>
+      <div class="diagram-node accent-border">
+        <div class="diagram-icon">🔀</div>
+        <div class="diagram-label">Relay Server</div>
+        <div class="diagram-sub">VPS or ngrok</div>
+      </div>
+      <div class="diagram-arrow">
+        ⟷
+        <span class="arr-label">WebSocket tunnel</span>
+      </div>
+      <div class="diagram-node">
+        <div class="diagram-icon">💻</div>
+        <div class="diagram-label">ADB Server</div>
+        <div class="diagram-sub">Local PC / Pi</div>
+      </div>
+      <div class="diagram-arrow">
+        ⟷
+        <span class="arr-label">USB / WiFi</span>
+      </div>
+      <div class="diagram-node">
+        <div class="diagram-icon">📱</div>
+        <div class="diagram-label">Android Device</div>
+        <div class="diagram-sub">Attached device</div>
+      </div>
+    </div>
+
+    <div class="relay-steps">
+      <div class="relay-step">
+        <div class="relay-step-label">Step 1 — VPS or ngrok</div>
+        <pre style="font-size:0.76rem;">RELAY_PORT=8080 \
+  npm run dev:relay
+# or: docker compose up -d</pre>
+        <p>Start the relay on a public server. For home servers, use the ngrok Docker setup — no static IP needed.</p>
+      </div>
+      <div class="relay-step">
+        <div class="relay-step-label">Step 2 — Local PC</div>
+        <pre style="font-size:0.76rem;">RELAY_URL=https://your-vps.com \
+RELAY_PASSWORD=secret \
+  npm run dev:server</pre>
+        <p>The server connects to the relay and prints a session code to the console to share with the remote user.</p>
+      </div>
+      <div class="relay-step">
+        <div class="relay-step-label">Step 3 — Remote browser</div>
+        <p style="margin-top:0; font-size:0.85rem; color:var(--text-muted);">Open the client URL from anywhere. Click the connection indicator in the header. Enter the relay URL and session code — done. Full device management, over the internet.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── Footer ─── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">📱 ADB Master</div>
+    <p>Free, open-source web interface for Android device management via ADB.</p>
+    <div class="footer-links">
+      <a href="https://github.com/devapro/adb-master" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/devapro/adb-master/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="https://github.com/devapro/adb-master/blob/main/openapi.yaml" target="_blank" rel="noopener">API Docs</a>
+      <a href="https://github.com/devapro/adb-master/blob/main/README.md" target="_blank" rel="noopener">README</a>
+      <a href="https://github.com/devapro/adb-master/blob/main/LICENSE" target="_blank" rel="noopener">License (ISC)</a>
+    </div>
+    <p style="margin-top:4px; font-size:0.8rem;">Built with React · Express · TypeScript · Socket.IO</p>
+  </div>
+</footer>
+
+</body>
+</html>

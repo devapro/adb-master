@@ -24,6 +24,7 @@ export function setupScreenSocket(nsp: Namespace): void {
 
       const captureLoop = async () => {
         if (!streaming) return;
+        const start = Date.now();
         try {
           const buffer = await screenService.captureScreenshot(serial);
           if (streaming) {
@@ -39,7 +40,8 @@ export function setupScreenSocket(nsp: Namespace): void {
           }
         }
         if (streaming) {
-          streamTimer = setTimeout(captureLoop, intervalMs);
+          const delay = Math.max(0, intervalMs - (Date.now() - start));
+          streamTimer = setTimeout(captureLoop, delay);
         }
       };
 
