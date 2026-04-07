@@ -37,6 +37,78 @@
   cursor: pointer;
 }
 
+.logcat-presets-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.logcat-presets-label {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.logcat-presets-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.logcat-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.logcat-preset-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-primary);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-sans);
+}
+
+.logcat-preset-btn:hover {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.logcat-preset-delete {
+  background: none;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.logcat-preset-delete:hover {
+  background: var(--color-danger);
+  color: var(--color-bg);
+}
+
+.logcat-preset-save-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.logcat-preset-name-input {
+  width: 140px;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
 .logcat-container {
   flex: 1;
   min-height: 0;

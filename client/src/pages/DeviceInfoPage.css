@@ -1,0 +1,337 @@
+.device-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.info-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.info-card h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--color-text-primary);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: var(--color-text-secondary);
+}
+
+.info-value {
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+  text-align: right;
+}
+
+.info-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.info-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.info-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.info-bar-fill.accent {
+  background: var(--color-accent);
+}
+
+.info-bar-fill.success {
+  background: var(--color-success);
+}
+
+.info-bar-fill.warning {
+  background: var(--color-warning);
+}
+
+.info-bar-fill.danger {
+  background: var(--color-danger);
+}
+
+.info-bar-percent {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  min-width: 40px;
+  text-align: right;
+}
+
+.info-stats {
+  display: flex;
+  gap: 24px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 8px;
+}
+
+.screenshot-card {
+  grid-column: 1 / -1;
+}
+
+.screenshot-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.screenshot-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.screenshot-btn:hover {
+  opacity: 0.85;
+}
+
+.screenshot-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.screenshot-btn.secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.screenshot-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.screenshot-preview {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.screenshot-preview img {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  object-fit: contain;
+}
+
+.recording-card {
+  grid-column: 1 / -1;
+}
+
+.recording-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.screenshot-btn.danger {
+  background: var(--color-danger);
+}
+
+.recording-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  font-size: 13px;
+}
+
+.recording-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.recording-text {
+  color: var(--color-text-secondary);
+}
+
+.recording-timer {
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.reboot-card {
+  grid-column: 1 / -1;
+}
+
+.reboot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.intent-card {
+  grid-column: 1 / -1;
+}
+
+.intent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.intent-chevron {
+  font-size: 12px;
+  transition: transform 0.2s;
+  color: var(--color-text-secondary);
+}
+
+.intent-chevron.open {
+  transform: rotate(180deg);
+}
+
+.intent-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.intent-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.intent-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.intent-field input,
+.intent-field select {
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.intent-field input:focus,
+.intent-field select:focus {
+  border-color: var(--color-accent);
+}
+
+.intent-extra-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.intent-extra-row select {
+  width: 100px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.intent-extra-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.intent-remove-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-tertiary);
+  color: var(--color-danger);
+  font-size: 16px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.intent-remove-btn:hover {
+  opacity: 0.7;
+}
+
+.intent-output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.intent-output label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.intent-output-text {
+  padding: 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}

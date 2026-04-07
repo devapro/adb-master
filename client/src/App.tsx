@@ -7,6 +7,9 @@ import { FilesPage } from './pages/FilesPage';
 import { NetworkPage } from './pages/NetworkPage';
 import { LogcatPage } from './pages/LogcatPage';
 import { TerminalPage } from './pages/TerminalPage';
+import { DeviceInfoPage } from './pages/DeviceInfoPage';
+import { InputPage } from './pages/InputPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ToastContainer } from './components/common/Toast';
 
 const App: React.FC = () => {
@@ -22,6 +25,9 @@ const App: React.FC = () => {
           <Route path="/network/:serial" element={<NetworkPage />} />
           <Route path="/logcat/:serial" element={<LogcatPage />} />
           <Route path="/terminal/:serial" element={<TerminalPage />} />
+          <Route path="/devices/:serial/info" element={<DeviceInfoPage />} />
+          <Route path="/devices/:serial/input" element={<InputPage />} />
+          <Route path="/devices/:serial/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

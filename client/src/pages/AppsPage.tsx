@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AppInfo, AppType } from '../types';
-import { getApps, uninstallApp, disableApp, stopApp, installApk } from '../api/apps.api';
+import { AppInfo, AppType, AppPermission } from '../types';
+import { getApps, uninstallApp, disableApp, stopApp, installApk, clearAppData, launchApp, extractApk, backupApp, restoreApp, getPermissions, grantPermission, revokePermission } from '../api/apps.api';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { SearchInput } from '../components/common/SearchInput';
@@ -35,7 +35,10 @@ export const AppsPage: React.FC = () => {
   const [modal, setModal] = useState<{ type: 'remove' | 'disable'; app: AppInfo } | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installProgress, setInstallProgress] = useState(0);
+  const [permissionsModal, setPermissionsModal] = useState<{ app: AppInfo; permissions: AppPermission[]; loading: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const [restoreTarget, setRestoreTarget] = useState<AppInfo | null>(null);
 
   useEffect(() => {
     if (!serial) return;
@@ -60,7 +63,7 @@ export const AppsPage: React.FC = () => {
     });
   }, [apps, search, typeFilter]);
 
-  const handleAction = async (action: 'remove' | 'disable' | 'stop', app: AppInfo) => {
+  const handleAction = async (action: 'remove' | 'disable' | 'stop' | 'clear' | 'launch' | 'extractApk' | 'backup' | 'restore', app: AppInfo) => {
     if (!serial) return;
     if (action === 'remove') {
       setModal({ type: 'remove', app });
@@ -70,9 +73,27 @@ export const AppsPage: React.FC = () => {
       setModal({ type: 'disable', app });
       return;
     }
+    if (action === 'restore') {
+      setRestoreTarget(app);
+      restoreInputRef.current?.click();
+      return;
+    }
     try {
-      const result = await stopApp(serial, app.packageName);
-      showToast(result.message, result.success ? 'success' : 'error');
+      if (action === 'backup') {
+        showToast(t('apps.backupStarted'), 'success');
+        await backupApp(serial, app.packageName);
+      } else if (action === 'launch') {
+        const result = await launchApp(serial, app.packageName);
+        showToast(result.message, result.success ? 'success' : 'error');
+      } else if (action === 'clear') {
+        const result = await clearAppData(serial, app.packageName);
+        showToast(result.message, result.success ? 'success' : 'error');
+      } else if (action === 'extractApk') {
+        await extractApk(serial, app.packageName);
+      } else {
+        const result = await stopApp(serial, app.packageName);
+        showToast(result.message, result.success ? 'success' : 'error');
+      }
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -119,6 +140,57 @@ export const AppsPage: React.FC = () => {
     }
   };
 
+  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !serial || !restoreTarget) return;
+    e.target.value = '';
+
+    try {
+      showToast(t('apps.restoreStarted'), 'success');
+      const result = await restoreApp(serial, restoreTarget.packageName, file);
+      showToast(result.message, result.success ? 'success' : 'error');
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    } finally {
+      setRestoreTarget(null);
+    }
+  };
+
+  const openPermissions = async (app: AppInfo) => {
+    if (!serial) return;
+    setPermissionsModal({ app, permissions: [], loading: true });
+    try {
+      const perms = await getPermissions(serial, app.packageName);
+      setPermissionsModal({ app, permissions: perms, loading: false });
+    } catch (err: any) {
+      showToast(err.message, 'error');
+      setPermissionsModal(null);
+    }
+  };
+
+  const togglePermission = async (perm: AppPermission) => {
+    if (!serial || !permissionsModal) return;
+    try {
+      const result = perm.granted
+        ? await revokePermission(serial, permissionsModal.app.packageName, perm.permission)
+        : await grantPermission(serial, permissionsModal.app.packageName, perm.permission);
+      showToast(result.message, result.success ? 'success' : 'error');
+      if (result.success) {
+        setPermissionsModal((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            permissions: prev.permissions.map((p) =>
+              p.permission === perm.permission ? { ...p, granted: !p.granted } : p
+            ),
+          };
+        });
+      }
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="page loading-page">
@@ -151,6 +223,13 @@ export const AppsPage: React.FC = () => {
           accept=".apk"
           style={{ display: 'none' }}
           onChange={handleInstall}
+        />
+        <input
+          ref={restoreInputRef}
+          type="file"
+          accept=".ab"
+          style={{ display: 'none' }}
+          onChange={handleRestore}
         />
         <Button
           variant="primary"
@@ -193,11 +272,29 @@ export const AppsPage: React.FC = () => {
               </div>
 
               <div className="app-actions">
+                <Button size="sm" variant="ghost" onClick={() => openPermissions(app)}>
+                  {t('apps.actions.permissions')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handleAction('launch', app)}>
+                  {t('apps.actions.launch')}
+                </Button>
                 <Button size="sm" variant="ghost" onClick={() => handleAction('stop', app)}>
                   {t('apps.actions.stop')}
                 </Button>
+                <Button size="sm" variant="ghost" onClick={() => handleAction('clear', app)}>
+                  {t('apps.actions.clear')}
+                </Button>
                 <Button size="sm" variant="secondary" onClick={() => handleAction('disable', app)}>
                   {t('apps.actions.disable')}
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => handleAction('extractApk', app)}>
+                  {t('apps.actions.extractApk')}
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => handleAction('backup', app)}>
+                  {t('apps.actions.backup')}
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => handleAction('restore', app)}>
+                  {t('apps.actions.restore')}
                 </Button>
                 <Button size="sm" variant="danger" onClick={() => handleAction('remove', app)}>
                   {t('apps.actions.remove')}
@@ -221,6 +318,42 @@ export const AppsPage: React.FC = () => {
             ? t('apps.confirmRemove', { appName: modal?.app.appName })
             : t('apps.confirmDisable', { appName: modal?.app.appName })}
         </p>
+      </Modal>
+
+      <Modal
+        open={!!permissionsModal}
+        title={t('apps.permissionsTitle', { appName: permissionsModal?.app.appName })}
+        onCancel={() => setPermissionsModal(null)}
+      >
+        {permissionsModal?.loading ? (
+          <div className="permissions-loading">
+            <Spinner size={24} />
+          </div>
+        ) : permissionsModal?.permissions.length === 0 ? (
+          <div className="permissions-empty">{t('apps.noPermissions')}</div>
+        ) : (
+          <div className="permissions-list">
+            {permissionsModal?.permissions.map((perm) => {
+              const shortName = perm.permission.replace(/^android\.permission\./, '');
+              return (
+                <div key={perm.permission} className="permission-row">
+                  <div className="permission-info">
+                    <span className="permission-short">{shortName}</span>
+                    {shortName !== perm.permission && (
+                      <span className="permission-full mono">{perm.permission}</span>
+                    )}
+                  </div>
+                  <button
+                    className={`permission-toggle ${perm.granted ? 'granted' : 'denied'}`}
+                    onClick={() => togglePermission(perm)}
+                  >
+                    {perm.granted ? t('apps.granted') : t('apps.denied')}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Modal>
     </div>
   );

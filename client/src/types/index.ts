@@ -4,3 +4,7 @@ export * from './file';
 export * from './network';
 export * from './logcat';
 export * from './api';
+export * from './device-info';
+export * from './intent';
+export * from './port';
+export * from './settings';

@@ -8,3 +8,7 @@ export const packageNameParam = z.object({
   serial: z.string().regex(/^[a-zA-Z0-9.:_-]+$/),
   packageName: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.]*$/, 'Invalid package name'),
 });
+
+export const permissionBody = z.object({
+  permission: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.]*$/, 'Invalid permission name'),
+});

@@ -19,6 +19,23 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
   F: '#ff0000',
 };
 
+type LogcatPreset = { name: string; level: string; tag: string; search: string };
+
+const PRESETS_KEY = 'logcat-presets';
+
+function loadPresets(): LogcatPreset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePresetsToStorage(presets: LogcatPreset[]) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
+
 export const LogcatPage: React.FC = () => {
   const { t } = useTranslation();
   const { serial } = useParams<{ serial: string }>();
@@ -28,6 +45,9 @@ export const LogcatPage: React.FC = () => {
   const [tagFilter, setTagFilter] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
+  const [presets, setPresets] = useState<LogcatPreset[]>(loadPresets);
+  const [presetName, setPresetName] = useState('');
+  const [showPresetInput, setShowPresetInput] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   useEffect(() => {
@@ -106,6 +126,31 @@ export const LogcatPage: React.FC = () => {
     } catch (err: any) {
       showToast(err.message, 'error');
     }
+  };
+
+  const handleApplyPreset = (preset: LogcatPreset) => {
+    setLevelFilter(preset.level as LogLevel | '');
+    setTagFilter(preset.tag);
+    setSearchFilter(preset.search);
+  };
+
+  const handleSavePreset = () => {
+    const name = presetName.trim();
+    if (!name) return;
+    const preset: LogcatPreset = { name, level: levelFilter, tag: tagFilter, search: searchFilter };
+    const next = [...presets, preset];
+    setPresets(next);
+    savePresetsToStorage(next);
+    setPresetName('');
+    setShowPresetInput(false);
+    showToast(t('logcat.presetSaved'), 'success');
+  };
+
+  const handleDeletePreset = (index: number) => {
+    const next = presets.filter((_, i) => i !== index);
+    setPresets(next);
+    savePresetsToStorage(next);
+    showToast(t('logcat.presetDeleted'), 'success');
   };
 
   const filteredLines = lines.filter((line) => {
@@ -188,6 +233,50 @@ export const LogcatPage: React.FC = () => {
             Auto-scroll
           </label>
         </div>
+      </div>
+
+      <div className="logcat-presets-bar">
+        <span className="logcat-presets-label">{t('logcat.presets')}:</span>
+        {presets.length === 0 && (
+          <span className="logcat-presets-empty">{t('logcat.noPresets')}</span>
+        )}
+        {presets.map((preset, i) => (
+          <span key={i} className="logcat-preset-chip">
+            <button
+              className="logcat-preset-btn"
+              onClick={() => handleApplyPreset(preset)}
+              title={`${preset.level || '*'}/${preset.tag || '*'}/${preset.search || '*'}`}
+            >
+              {preset.name}
+            </button>
+            <button
+              className="logcat-preset-delete"
+              onClick={() => handleDeletePreset(i)}
+              title={t('logcat.deletePreset')}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {showPresetInput ? (
+          <span className="logcat-preset-save-group">
+            <input
+              type="text"
+              className="form-input logcat-preset-name-input"
+              placeholder={t('logcat.presetName')}
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSavePreset(); if (e.key === 'Escape') setShowPresetInput(false); }}
+              autoFocus
+            />
+            <Button size="sm" onClick={handleSavePreset}>{t('logcat.savePreset')}</Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowPresetInput(false)}>{t('common.cancel')}</Button>
+          </span>
+        ) : (
+          <Button size="sm" variant="secondary" onClick={() => setShowPresetInput(true)}>
+            + {t('logcat.savePreset')}
+          </Button>
+        )}
       </div>
 
       <div className="logcat-container">
