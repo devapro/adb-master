@@ -291,6 +291,24 @@
     "showTaps": "Show Taps",
     "loading": "Loading settings..."
   },
+  "connection": {
+    "title": "Connection",
+    "local": "Local",
+    "remote": "Remote",
+    "relayUrl": "Relay URL",
+    "sessionId": "Session Code",
+    "password": "Password",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "useLocal": "Use Local Connection",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "agentOffline": "Agent is offline",
+    "invalidSession": "Invalid session",
+    "checking": "Checking connection...",
+    "remoteMode": "Remote",
+    "localMode": "Local"
+  },
   "common": {
     "loading": "Loading...",
     "error": "An error occurred",

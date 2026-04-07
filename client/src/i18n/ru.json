@@ -291,6 +291,24 @@
     "showTaps": "Показать касания",
     "loading": "Загрузка настроек..."
   },
+  "connection": {
+    "title": "Подключение",
+    "local": "Локально",
+    "remote": "Удалённое",
+    "relayUrl": "URL ретранслятора",
+    "sessionId": "Код сессии",
+    "password": "Пароль",
+    "connect": "Подключить",
+    "disconnect": "Отключить",
+    "useLocal": "Локальное подключение",
+    "connected": "Подключено",
+    "notConnected": "Не подключено",
+    "agentOffline": "Агент не в сети",
+    "invalidSession": "Неверная сессия",
+    "checking": "Проверка подключения...",
+    "remoteMode": "Удалённое",
+    "localMode": "Локально"
+  },
   "common": {
     "loading": "Загрузка...",
     "error": "Произошла ошибка",

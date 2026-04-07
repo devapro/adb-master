@@ -1,15 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../../store/device.store';
 import { useThemeStore } from '../../store/theme.store';
 import { useLocaleStore } from '../../store/locale.store';
+import { useConnectionStore } from '../../store/connection.store';
+import { ConnectionModal } from '../common/ConnectionModal';
 import './Header.css';
 
 export const Header: React.FC = () => {
   const { t } = useTranslation();
   const { devices, selectedSerial, selectDevice } = useDeviceStore();
-  const { mode, toggle } = useThemeStore();
+  const { mode: themeMode, toggle } = useThemeStore();
   const { locale, setLocale } = useLocaleStore();
+  const connectionMode = useConnectionStore((s) => s.mode);
+  const sessionId = useConnectionStore((s) => s.sessionId);
+  const connected = useConnectionStore((s) => s.connected);
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <header className="header">
@@ -31,6 +37,15 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="header-right">
+        <button className="connection-indicator" onClick={() => setModalOpen(true)}>
+          <span
+            className={`connection-dot ${connectionMode}${connectionMode === 'remote' && !connected ? ' disconnected' : ''}`}
+          />
+          {connectionMode === 'remote'
+            ? `${t('connection.remoteMode')}: ${sessionId}`
+            : t('connection.localMode')}
+        </button>
+
         <select
           className="header-select lang-select"
           value={locale}
@@ -41,7 +56,7 @@ export const Header: React.FC = () => {
         </select>
 
         <button className="theme-toggle" onClick={toggle} title="Toggle theme">
-          {mode === 'dark' ? (
+          {themeMode === 'dark' ? (
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="5" />
               <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
@@ -53,6 +68,8 @@ export const Header: React.FC = () => {
           )}
         </button>
       </div>
+
+      <ConnectionModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </header>
   );
 };

@@ -1,5 +1,5 @@
 {
-  "name": "adb-master-server",
+  "name": "adb-master-relay",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -10,18 +10,15 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "multer": "^1.4.5-lts.1",
-    "socket.io": "^4.8.1",
-    "winston": "^3.17.0",
-    "ws": "^8.18.3",
-    "zod": "^3.24.2"
+    "uuid": "^11.1.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
-    "@types/multer": "^1.4.12",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.13",
     "@types/node": "^22.10.5",
-    "@types/ws": "^8.18.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }

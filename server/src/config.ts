@@ -14,4 +14,6 @@ export const config = {
   maxUploadSize: 500 * 1024 * 1024, // 500MB
   uploadTimeout: 10 * 60 * 1000, // 10 minutes
   uploadDir: path.join(os.tmpdir(), 'adb-master-uploads'),
+  relayUrl: process.env.RELAY_URL || '',
+  relayPassword: process.env.RELAY_PASSWORD || '',
 };
