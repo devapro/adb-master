@@ -2,7 +2,9 @@ import api from './axios-client';
 import { AppInfo, AppActionResult, AppPermission, ApiResponse } from '../types';
 
 export const getApps = (serial: string, type: string = 'all') =>
-  api.get<ApiResponse<AppInfo[]>>(`/devices/${serial}/apps`, { params: { type } }).then((r) => r.data.data);
+  api
+    .get<ApiResponse<AppInfo[]>>(`/devices/${serial}/apps`, { params: { type }, timeout: 3 * 60 * 1000 })
+    .then((r) => r.data.data);
 
 export const installApk = (
   serial: string,

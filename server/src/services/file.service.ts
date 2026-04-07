@@ -4,7 +4,9 @@ import { config } from '../config';
 
 class FileService {
   async listFiles(serial: string, path: string = '/sdcard', minSize: number = 0): Promise<FileEntry[]> {
-    const result = await adbService.shell(serial, `ls -la "${path}" 2>/dev/null`);
+    // Trailing slash forces ls to follow symlinks (e.g. /sdcard -> /storage/self/primary)
+    const normalised = path.endsWith('/') ? path : `${path}/`;
+    const result = await adbService.shell(serial, `ls -la "${normalised}" 2>/dev/null`);
     const lines = result.stdout.split('\n').filter((l) => l.trim() && !l.startsWith('total'));
 
     const entries: FileEntry[] = [];
@@ -35,18 +37,19 @@ class FileService {
 
   private parseLsLine(line: string, parentPath: string): FileEntry | null {
     const parts = line.trim().split(/\s+/);
-    if (parts.length < 7) return null;
+    // Android ls -la: perms links owner group size date time name…
+    if (parts.length < 8) return null;
 
     const permissions = parts[0];
     const isDirectory = permissions.startsWith('d');
-    const name = parts.slice(6).join(' ');
+    const name = parts.slice(7).join(' ');
 
     if (name === '.' || name === '..') return null;
 
-    const sizeStr = parts[3];
+    const sizeStr = parts[4];
     const sizeBytes = parseInt(sizeStr, 10) || 0;
 
-    const dateStr = `${parts[4]} ${parts[5]}`;
+    const dateStr = `${parts[5]} ${parts[6]}`;
 
     return {
       path: `${parentPath}/${name}`.replace(/\/+/g, '/'),

@@ -19,10 +19,14 @@ class AppService {
       })
       .filter((p): p is { apkPath: string; packageName: string } => p !== null);
 
+    const BATCH = 10;
     const apps: AppInfo[] = [];
-    for (const pkg of packages) {
-      const info = await this.getAppDetail(serial, pkg.packageName, pkg.apkPath);
-      if (info) apps.push(info);
+    for (let i = 0; i < packages.length; i += BATCH) {
+      const batch = packages.slice(i, i + BATCH);
+      const results = await Promise.all(
+        batch.map((pkg) => this.getAppDetail(serial, pkg.packageName, pkg.apkPath))
+      );
+      apps.push(...results.filter((a): a is AppInfo => a !== null));
     }
 
     return apps;
@@ -34,7 +38,10 @@ class AppService {
     apkPath: string
   ): Promise<AppInfo | null> {
     try {
-      const dumpResult = await adbService.shell(serial, `dumpsys package ${packageName}`);
+      const [dumpResult, sizes] = await Promise.all([
+        adbService.shell(serial, `dumpsys package ${packageName}`),
+        this.getAppSize(serial, packageName, apkPath),
+      ]);
       const dump = dumpResult.stdout;
 
       const versionName = this.extractField(dump, 'versionName') || '';
@@ -47,13 +54,13 @@ class AppService {
         appType = 'preinstalled';
       }
 
-      const appName = await this.getAppLabel(serial, packageName);
-
-      const sizes = await this.getAppSize(serial, packageName);
+      // Extract label from dumpsys output — avoids a separate ADB call
+      const labelMatch = dump.match(/non-localized-label:(.+)/);
+      const appName = (labelMatch ? labelMatch[1].trim() : null) || packageName;
 
       return {
         packageName,
-        appName: appName || packageName,
+        appName,
         versionName,
         type: appType,
         sizeBytes: sizes.total,
@@ -77,50 +84,25 @@ class AppService {
     }
   }
 
-  private async getAppLabel(serial: string, packageName: string): Promise<string | null> {
-    try {
-      const result = await adbService.shell(
-        serial,
-        `cmd package resolve-activity --brief ${packageName} | tail -1`
-      );
-      const label = result.stdout.trim();
-      if (label && !label.includes('/')) return label;
-
-      const dumpResult = await adbService.shell(
-        serial,
-        `dumpsys package ${packageName} | grep -A1 "non-localized-label"`
-      );
-      const match = dumpResult.stdout.match(/non-localized-label:(.+)/);
-      if (match) return match[1].trim();
-
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
   private async getAppSize(
     serial: string,
-    packageName: string
+    packageName: string,
+    apkPath: string
   ): Promise<{ total: number; data: number; cache: number }> {
     try {
-      const result = await adbService.shell(serial, `pm path ${packageName}`);
-      const apkPath = result.stdout.replace('package:', '').trim();
+      const [sizeResult, duResult] = await Promise.all([
+        adbService.shell(serial, `stat -c %s "${apkPath}" 2>/dev/null || echo 0`),
+        adbService.shell(
+          serial,
+          `du -s /data/data/${packageName} /data/data/${packageName}/cache 2>/dev/null; true`
+        ),
+      ]);
 
-      const sizeResult = await adbService.shell(serial, `stat -c %s "${apkPath}" 2>/dev/null || echo 0`);
       const total = parseInt(sizeResult.stdout.trim(), 10) || 0;
 
-      const dataResult = await adbService.shell(
-        serial,
-        `du -s /data/data/${packageName} 2>/dev/null | cut -f1`
-      );
-      const data = (parseInt(dataResult.stdout.trim(), 10) || 0) * 1024;
-
-      const cacheResult = await adbService.shell(
-        serial,
-        `du -s /data/data/${packageName}/cache 2>/dev/null | cut -f1`
-      );
-      const cache = (parseInt(cacheResult.stdout.trim(), 10) || 0) * 1024;
+      const duLines = duResult.stdout.trim().split('\n');
+      const data = (parseInt(duLines[0]?.split(/\s/)[0] || '0', 10) || 0) * 1024;
+      const cache = (parseInt(duLines[1]?.split(/\s/)[0] || '0', 10) || 0) * 1024;
 
       return { total, data, cache };
     } catch {

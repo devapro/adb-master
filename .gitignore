@@ -7,3 +7,4 @@ server/dist
 .idea
 .vscode
 client/node_modules
+.playwright-mcp
