@@ -14,4 +14,5 @@ export interface LogcatFilter {
   level?: LogLevel;
   tag?: string;
   search?: string;
+  packageName?: string;
 }

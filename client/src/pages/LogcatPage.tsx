@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
@@ -19,7 +19,7 @@ const LEVEL_COLORS: Record<LogLevel, string> = {
   F: '#ff0000',
 };
 
-type LogcatPreset = { name: string; level: string; tag: string; search: string };
+type LogcatPreset = { name: string; level: string; tag: string; search: string; packageName: string };
 
 const PRESETS_KEY = 'logcat-presets';
 
@@ -44,28 +44,39 @@ export const LogcatPage: React.FC = () => {
   const [levelFilter, setLevelFilter] = useState<LogLevel | ''>('');
   const [tagFilter, setTagFilter] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
+  const [packageFilter, setPackageFilter] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
   const [presets, setPresets] = useState<LogcatPreset[]>(loadPresets);
   const [presetName, setPresetName] = useState('');
   const [showPresetInput, setShowPresetInput] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const pendingLinesRef = useRef<LogcatLine[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     logcatSocket.connect();
 
     logcatSocket.on('logcat:line', (line: LogcatLine) => {
-      setLines((prev) => {
-        const next = [...prev, line];
-        if (next.length > 10000) return next.slice(-5000);
-        return next;
-      });
+      pendingLinesRef.current.push(line);
     });
 
     logcatSocket.on('logcat:error', (data: { message: string }) => {
       showToast(data.message, 'error');
     });
 
+    flushTimerRef.current = setInterval(() => {
+      const batch = pendingLinesRef.current;
+      if (batch.length === 0) return;
+      pendingLinesRef.current = [];
+      setLines((prev) => {
+        const next = prev.concat(batch);
+        if (next.length > 10000) return next.slice(-5000);
+        return next;
+      });
+    }, 100);
+
     return () => {
+      if (flushTimerRef.current) clearInterval(flushTimerRef.current);
       logcatSocket.off('logcat:line');
       logcatSocket.off('logcat:error');
       logcatSocket.emit('logcat:stop');
@@ -73,20 +84,16 @@ export const LogcatPage: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (autoScroll && lines.length > 0) {
-      virtuosoRef.current?.scrollToIndex({ index: lines.length - 1, behavior: 'smooth' });
-    }
-  }, [lines.length, autoScroll]);
-
   const handleStart = () => {
     if (!serial) return;
     setLines([]);
+    pendingLinesRef.current = [];
     logcatSocket.emit('logcat:start', {
       serial,
       filters: {
         level: levelFilter || undefined,
         tag: tagFilter || undefined,
+        packageName: packageFilter || undefined,
       },
     });
     setStreaming(true);
@@ -132,12 +139,13 @@ export const LogcatPage: React.FC = () => {
     setLevelFilter(preset.level as LogLevel | '');
     setTagFilter(preset.tag);
     setSearchFilter(preset.search);
+    setPackageFilter(preset.packageName || '');
   };
 
   const handleSavePreset = () => {
     const name = presetName.trim();
     if (!name) return;
-    const preset: LogcatPreset = { name, level: levelFilter, tag: tagFilter, search: searchFilter };
+    const preset: LogcatPreset = { name, level: levelFilter, tag: tagFilter, search: searchFilter, packageName: packageFilter };
     const next = [...presets, preset];
     setPresets(next);
     savePresetsToStorage(next);
@@ -153,32 +161,27 @@ export const LogcatPage: React.FC = () => {
     showToast(t('logcat.presetDeleted'), 'success');
   };
 
-  const filteredLines = lines.filter((line) => {
-    if (searchFilter) {
-      const q = searchFilter.toLowerCase();
-      if (!line.message.toLowerCase().includes(q) && !line.tag.toLowerCase().includes(q)) {
-        return false;
-      }
-    }
-    return true;
-  });
+  const filteredLines = useMemo(() => {
+    if (!searchFilter) return lines;
+    const q = searchFilter.toLowerCase();
+    return lines.filter(
+      (line) => line.message.toLowerCase().includes(q) || line.tag.toLowerCase().includes(q)
+    );
+  }, [lines, searchFilter]);
 
   const renderLine = useCallback(
-    (index: number) => {
-      const line = filteredLines[index];
-      return (
-        <div className="logcat-line" key={index}>
-          <span className="logcat-time mono">{line.timestamp}</span>
-          <span className="logcat-pid mono">{line.pid}</span>
-          <span className="logcat-level mono" style={{ color: LEVEL_COLORS[line.level] }}>
-            {line.level}
-          </span>
-          <span className="logcat-tag mono">{line.tag}</span>
-          <span className="logcat-msg">{line.message}</span>
-        </div>
-      );
-    },
-    [filteredLines]
+    (_index: number, line: LogcatLine) => (
+      <div className="logcat-line">
+        <span className="logcat-time mono">{line.timestamp}</span>
+        <span className="logcat-pid mono">{line.pid}</span>
+        <span className="logcat-level mono" style={{ color: LEVEL_COLORS[line.level] }}>
+          {line.level}
+        </span>
+        <span className="logcat-tag mono">{line.tag}</span>
+        <span className="logcat-msg">{line.message}</span>
+      </div>
+    ),
+    []
   );
 
   return (
@@ -204,6 +207,14 @@ export const LogcatPage: React.FC = () => {
             placeholder={t('logcat.filter.tag')}
             value={tagFilter}
             onChange={(e) => setTagFilter(e.target.value)}
+          />
+
+          <input
+            type="text"
+            className="form-input"
+            placeholder={t('logcat.filter.packageName')}
+            value={packageFilter}
+            onChange={(e) => setPackageFilter(e.target.value)}
           />
 
           <input
@@ -245,7 +256,7 @@ export const LogcatPage: React.FC = () => {
             <button
               className="logcat-preset-btn"
               onClick={() => handleApplyPreset(preset)}
-              title={`${preset.level || '*'}/${preset.tag || '*'}/${preset.search || '*'}`}
+              title={`${preset.level || '*'}/${preset.tag || '*'}/${preset.packageName || '*'}/${preset.search || '*'}`}
             >
               {preset.name}
             </button>
@@ -285,9 +296,9 @@ export const LogcatPage: React.FC = () => {
         ) : (
           <Virtuoso
             ref={virtuosoRef}
-            totalCount={filteredLines.length}
+            data={filteredLines}
             itemContent={renderLine}
-            followOutput={autoScroll}
+            followOutput={autoScroll ? 'smooth' : false}
             className="logcat-scroller"
           />
         )}

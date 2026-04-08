@@ -80,14 +80,15 @@ if $need_node; then
     install_brew
     brew install node
   else
-    # Use NodeSource for a pinned LTS version on Linux
     if have curl; then
-      curl -fsSL https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x | sudo -E bash - 2>/dev/null || true
+      info "Setting up NodeSource repository..."
+      curl -fsSL "https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x" | sudo -E bash - \
+        || die "Failed to set up NodeSource repository. Install Node.js >= v${NODE_MIN_MAJOR} manually: https://nodejs.org"
     fi
     if have apt-get; then
       sudo apt-get install -y nodejs
     elif have dnf; then
-      sudo dnf module install -y nodejs:${NODE_MIN_MAJOR}
+      sudo dnf module install -y "nodejs:${NODE_MIN_MAJOR}"
     elif have yum; then
       sudo yum install -y nodejs
     elif have pacman; then
@@ -100,6 +101,25 @@ if $need_node; then
 fi
 
 success "npm: $(npm --version)"
+
+# ── install ADB ────────────────────────────────────────────────────────────
+if have adb; then
+  success "adb already installed: $(adb version | head -1)"
+else
+  warn "adb is not installed."
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  ADB_SCRIPT="$SCRIPT_DIR/install-adb.sh"
+  if [[ -f "$ADB_SCRIPT" ]]; then
+    read -rp "$(echo -e "${CYAN}[info]${RESET} Install ADB now? [Y/n] ")" answer
+    if [[ "${answer:-y}" =~ ^[Yy]$ ]]; then
+      bash "$ADB_SCRIPT"
+    else
+      warn "Skipping ADB install. You will need 'adb' in your PATH to use ADB Master."
+    fi
+  else
+    warn "Install Android platform-tools manually: https://developer.android.com/tools/releases/platform-tools"
+  fi
+fi
 
 # ── clone repo ─────────────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -114,13 +134,15 @@ fi
 info "Installing npm dependencies..."
 npm install --prefix "$INSTALL_DIR"
 
+# ── build for production ──────────────────────────────────────────────────
+info "Building ADB Master..."
+npm run build --prefix "$INSTALL_DIR"
+
 # ── done ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${GREEN}Installation complete!${RESET}"
 echo ""
 echo -e "  ${BOLD}cd ${INSTALL_DIR}${RESET}"
-echo -e "  ${BOLD}npm run dev${RESET}   — start server (port 3000) + client (port 5173)"
-echo ""
-echo "  Make sure 'adb' is installed and accessible in your PATH."
-echo "  Android SDK platform-tools: https://developer.android.com/tools/releases/platform-tools"
+echo -e "  ${BOLD}npm run dev${RESET}     — development mode (server :3000 + client :5173)"
+echo -e "  ${BOLD}npm start${RESET}       — production mode (port 3000)"
 echo ""

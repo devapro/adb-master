@@ -10,7 +10,8 @@ const clientDir = path.join(root, 'client');
 
 // Check if ADB is available
 try {
-  execSync('adb version', { stdio: 'ignore' });
+  const adbVersion = execSync('adb version', { encoding: 'utf8' }).trim().split('\n')[0];
+  console.log(`Found ${adbVersion}`);
 } catch {
   console.error('Error: adb not found in PATH.');
   console.error('Install Android platform-tools: https://developer.android.com/tools/releases/platform-tools');

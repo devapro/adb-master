@@ -27,7 +27,7 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({ open, onClose 
   const [status, setStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
   const [relayInfo, setRelayInfo] = useState<RelaySessionInfo | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && mode === 'local') {
@@ -35,12 +35,11 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({ open, onClose 
     }
   }, [open, mode]);
 
-  const handleCopyShareUrl = async () => {
-    if (!relayInfo?.shareUrl) return;
+  const handleCopy = async (value: string, field: string) => {
     try {
-      await navigator.clipboard.writeText(relayInfo.shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
     } catch {
       // fallback
     }
@@ -167,17 +166,55 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({ open, onClose 
                       )}
                     </div>
                     <div className="relay-share-field">
-                      <label>{t('connection.shareUrl')}</label>
+                      <label>{t('connection.relayUrl')}</label>
                       <div className="relay-share-row">
-                        <input type="text" readOnly value={relayInfo.shareUrl || ''} />
-                        <button className="relay-copy-btn" onClick={handleCopyShareUrl}>
-                          {copied ? t('connection.copied') : t('connection.copy')}
+                        <input type="text" readOnly value={relayInfo.relayUrl || ''} />
+                        <button
+                          className="relay-copy-icon-btn"
+                          onClick={() => handleCopy(relayInfo.relayUrl || '', 'relayUrl')}
+                          title={copiedField === 'relayUrl' ? t('connection.copied') : t('connection.copy')}
+                        >
+                          {copiedField === 'relayUrl' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                          )}
                         </button>
                       </div>
                     </div>
                     <div className="relay-share-field">
                       <label>{t('connection.sessionId')}</label>
-                      <input type="text" readOnly value={relayInfo.sessionId || ''} className="mono" />
+                      <div className="relay-share-row">
+                        <input type="text" readOnly value={relayInfo.sessionId || ''} className="mono" />
+                        <button
+                          className="relay-copy-icon-btn"
+                          onClick={() => handleCopy(relayInfo.sessionId || '', 'sessionId')}
+                          title={copiedField === 'sessionId' ? t('connection.copied') : t('connection.copy')}
+                        >
+                          {copiedField === 'sessionId' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relay-share-field">
+                      <label>{t('connection.shareUrl')}</label>
+                      <div className="relay-share-row">
+                        <input type="text" readOnly value={relayInfo.shareUrl || ''} />
+                        <button
+                          className="relay-copy-icon-btn"
+                          onClick={() => handleCopy(relayInfo.shareUrl || '', 'shareUrl')}
+                          title={copiedField === 'shareUrl' ? t('connection.copied') : t('connection.copy')}
+                        >
+                          {copiedField === 'shareUrl' ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

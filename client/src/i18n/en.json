@@ -158,6 +158,7 @@
     "filter": {
       "level": "Log Level",
       "tag": "Tag",
+      "packageName": "Package name",
       "search": "Search...",
       "all": "All Levels"
     },

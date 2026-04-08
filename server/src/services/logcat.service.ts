@@ -4,7 +4,23 @@ import { adbService } from './adb.service';
 import { parseLogcatLine } from '../utils/adb-parser';
 import { config } from '../config';
 
+const PID_RESOLVE_INTERVAL = 5000;
+
 class LogcatService {
+  private async resolvePids(serial: string, packageName: string): Promise<Set<number>> {
+    try {
+      const result = await adbService.shell(serial, `pidof ${packageName}`);
+      const pids = result.stdout
+        .trim()
+        .split(/\s+/)
+        .map((s) => parseInt(s, 10))
+        .filter((n) => !isNaN(n));
+      return new Set(pids);
+    } catch {
+      return new Set();
+    }
+  }
+
   startStream(
     serial: string,
     filter: LogcatFilter,
@@ -22,6 +38,22 @@ class LogcatService {
 
     const proc = adbService.spawnProcess(serial, args);
     let buffer = '';
+    let allowedPids: Set<number> | null = null;
+    let pidTimer: ReturnType<typeof setInterval> | null = null;
+    const filterByPid = !!filter.packageName;
+
+    if (filter.packageName) {
+      // Start with empty set to block all lines until first resolve
+      allowedPids = new Set();
+      this.resolvePids(serial, filter.packageName).then((pids) => {
+        allowedPids = pids;
+      });
+      pidTimer = setInterval(() => {
+        this.resolvePids(serial, filter.packageName!).then((pids) => {
+          allowedPids = pids;
+        });
+      }, PID_RESOLVE_INTERVAL);
+    }
 
     proc.stdout?.on('data', (data: Buffer) => {
       buffer += data.toString();
@@ -35,6 +67,9 @@ class LogcatService {
           if (filter.search && !parsed.message.toLowerCase().includes(filter.search.toLowerCase())) {
             continue;
           }
+          if (filterByPid && (!allowedPids || !allowedPids.has(parsed.pid))) {
+            continue;
+          }
           onLine(parsed);
         }
       }
@@ -42,6 +77,10 @@ class LogcatService {
 
     proc.stderr?.on('data', (data: Buffer) => {
       onError(data.toString());
+    });
+
+    proc.on('close', () => {
+      if (pidTimer) clearInterval(pidTimer);
     });
 
     return proc;
