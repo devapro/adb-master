@@ -53,7 +53,7 @@ TEMP=$(mktemp -d)
 trap 'rm -rf "$TEMP"' EXIT
 
 # ── find or download Node.js ───────────────────────────────────────────────
-NODE_LOCAL="${INSTALL_DIR}/.nodejs"
+NODE_LOCAL="$(pwd)/${INSTALL_DIR}/.nodejs"
 NODE_BIN=""
 NPM_BIN=""
 
