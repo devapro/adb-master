@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { screenSocket } from '../socket/socket-client';
-import { sendTap, sendSwipe, sendKeyEvent, sendText } from '../api/input.api';
 import { Button } from '../components/common/Button';
 import { showToast } from '../components/common/Toast';
 import './ScreenPage.css';
@@ -29,49 +28,51 @@ export const ScreenPage: React.FC = () => {
   const { t } = useTranslation();
   const { serial } = useParams<{ serial: string }>();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderingRef = useRef(false);
   const [streaming, setStreaming] = useState(false);
   const [fps, setFps] = useState(1);
   const [frameCount, setFrameCount] = useState(0);
-  const [actualFps, setActualFps] = useState(0);
+  const [actualFps, setActualFps] = useState<number>(0);
   const fpsCounterRef = useRef({ count: 0, lastTime: Date.now() });
   const pointerDownRef = useRef<PointerState | null>(null);
 
   useEffect(() => {
     screenSocket.connect();
 
-    screenSocket.on('screen:frame', (frame: { data: string; timestamp: number }) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const binary = atob(frame.data);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: 'image/png' });
-      const url = URL.createObjectURL(blob);
-
-      const img = new Image();
-      img.onload = () => {
-        if (canvas.width !== img.naturalWidth) canvas.width = img.naturalWidth;
-        if (canvas.height !== img.naturalHeight) canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
-      };
-      img.onerror = () => URL.revokeObjectURL(url);
-      img.src = url;
-
+    screenSocket.on('screen:frame', (data: ArrayBuffer, _timestamp: number) => {
+      // FPS counting — always count, even if frame is dropped for rendering
+      setFrameCount((n) => n + 1);
       const counter = fpsCounterRef.current;
       counter.count++;
       const now = Date.now();
       const elapsed = now - counter.lastTime;
       if (elapsed >= 1000) {
-        setActualFps(Math.round((counter.count * 1000) / elapsed));
+        const raw = (counter.count * 1000) / elapsed;
+        // Show one decimal for sub-1 fps so slow devices don't show "0 fps"
+        setActualFps(raw < 1 ? parseFloat(raw.toFixed(1)) : Math.round(raw));
         counter.count = 0;
         counter.lastTime = now;
       }
-      setFrameCount((n) => n + 1);
+
+      // Skip if previous frame is still decoding/rendering
+      const canvas = canvasRef.current;
+      if (!canvas || renderingRef.current) return;
+
+      renderingRef.current = true;
+      // Binary JPEG blob — no base64 decode needed
+      const blob = new Blob([data], { type: 'image/jpeg' });
+
+      // Decode off main thread via createImageBitmap
+      createImageBitmap(blob).then((bitmap) => {
+        if (canvas.width !== bitmap.width) canvas.width = bitmap.width;
+        if (canvas.height !== bitmap.height) canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        renderingRef.current = false;
+      }).catch(() => {
+        renderingRef.current = false;
+      });
     });
 
     screenSocket.on('screen:error', (err: { message: string }) => {
@@ -79,9 +80,14 @@ export const ScreenPage: React.FC = () => {
       setStreaming(false);
     });
 
+    screenSocket.on('input:error', (err: { message: string }) => {
+      showToast(err.message, 'error');
+    });
+
     return () => {
       screenSocket.off('screen:frame');
       screenSocket.off('screen:error');
+      screenSocket.off('input:error');
       screenSocket.emit('screen:stop');
       screenSocket.disconnect();
     };
@@ -131,18 +137,14 @@ export const ScreenPage: React.FC = () => {
     ArrowDown: 20,
   };
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
     if (!serial || !streaming) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return; // let browser shortcuts through
     e.preventDefault();
-    try {
-      if (SPECIAL_KEYS[e.key] !== undefined) {
-        await sendKeyEvent(serial, SPECIAL_KEYS[e.key]);
-      } else if (e.key.length === 1) {
-        await sendText(serial, e.key);
-      }
-    } catch (err: any) {
-      showToast(err.message, 'error');
+    if (SPECIAL_KEYS[e.key] !== undefined) {
+      screenSocket.emit('input:keyevent', { serial, keycode: SPECIAL_KEYS[e.key] });
+    } else if (e.key.length === 1) {
+      screenSocket.emit('input:text', { serial, text: e.key });
     }
   };
 
@@ -160,7 +162,7 @@ export const ScreenPage: React.FC = () => {
     };
   };
 
-  const handlePointerUp = async (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!serial || !streaming || !pointerDownRef.current) return;
     const down = pointerDownRef.current;
     pointerDownRef.current = null;
@@ -168,15 +170,13 @@ export const ScreenPage: React.FC = () => {
     const dClient = Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY);
     const duration = Date.now() - down.time;
 
-    try {
-      if (dClient < 8) {
-        await sendTap(serial, down.deviceX, down.deviceY);
-      } else {
-        const { x: x2, y: y2 } = toDeviceCoords(e.clientX, e.clientY);
-        await sendSwipe(serial, down.deviceX, down.deviceY, x2, y2, duration);
-      }
-    } catch (err: any) {
-      showToast(err.message, 'error');
+    if (dClient < 8) {
+      screenSocket.emit('input:tap', { serial, x: down.deviceX, y: down.deviceY });
+    } else {
+      const { x: x2, y: y2 } = toDeviceCoords(e.clientX, e.clientY);
+      screenSocket.emit('input:swipe', {
+        serial, x1: down.deviceX, y1: down.deviceY, x2, y2, duration,
+      });
     }
   };
 
@@ -184,13 +184,9 @@ export const ScreenPage: React.FC = () => {
     pointerDownRef.current = null;
   };
 
-  const handleKeyEvent = async (code: number) => {
+  const handleKeyEvent = (code: number) => {
     if (!serial) return;
-    try {
-      await sendKeyEvent(serial, code);
-    } catch (err: any) {
-      showToast(err.message, 'error');
-    }
+    screenSocket.emit('input:keyevent', { serial, keycode: code });
   };
 
   return (
