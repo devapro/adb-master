@@ -1,6 +1,7 @@
 import http from 'http';
 import WebSocket from 'ws';
 import { logger } from '../utils/logger';
+import { SocketTunnel } from './socket-tunnel';
 
 // Re-define tunnel types locally to avoid cross-workspace imports
 interface TunnelRequest {
@@ -63,11 +64,13 @@ export class RelayClient {
   private reconnectAttempts = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private stopping = false;
+  private socketTunnel: SocketTunnel;
 
   constructor(relayUrl: string, localPort: number, password?: string) {
     this.relayUrl = relayUrl.replace(/\/$/, '');
     this.localPort = localPort;
     this.password = password || undefined;
+    this.socketTunnel = new SocketTunnel(localPort);
     activeRelayClient = this;
   }
 
@@ -88,6 +91,7 @@ export class RelayClient {
 
   stop(): void {
     this.stopping = true;
+    this.socketTunnel.detach();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -144,6 +148,7 @@ export class RelayClient {
     this.ws.on('open', () => {
       logger.info('Connected to relay server via WebSocket');
       this.reconnectAttempts = 0;
+      this.socketTunnel.attach(this.ws!);
     });
 
     this.ws.on('message', (data: WebSocket.Data) => {
@@ -152,6 +157,7 @@ export class RelayClient {
 
     this.ws.on('close', () => {
       logger.warn('Relay WebSocket closed');
+      this.socketTunnel.detach();
       this.scheduleReconnect();
     });
 
@@ -174,6 +180,13 @@ export class RelayClient {
         this.handleHttpRequest(msg as unknown as TunnelRequest).catch((err) => {
           logger.error(`Error handling tunnel request: ${err}`);
         });
+        break;
+      case 'socket-connect':
+      case 'socket-disconnect':
+        this.socketTunnel.handleConnect(msg as { type: 'socket-connect' | 'socket-disconnect'; namespace: string; socketId: string });
+        break;
+      case 'socket-event':
+        this.socketTunnel.handleEvent(msg as { type: 'socket-event'; namespace: string; socketId: string; event: string; args: any[] });
         break;
       case 'ping':
         this.send({ type: 'pong' });

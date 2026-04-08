@@ -2,13 +2,12 @@ import { io, Socket } from 'socket.io-client';
 import WebSocket from 'ws';
 import { logger } from '../utils/logger';
 
-// Local tunnel types
 interface TunnelSocketEvent {
   type: 'socket-event';
   namespace: string;
+  socketId: string;
   event: string;
-  args: unknown[];
-  socketId?: string;
+  args: any[];
 }
 
 interface TunnelSocketConnect {
@@ -17,96 +16,129 @@ interface TunnelSocketConnect {
   socketId: string;
 }
 
-const NAMESPACES = ['/devices'];
-// TODO: Add /logcat and /shell namespace tunneling
-// These are more complex due to their stateful, streaming nature.
+const NAMESPACES = ['/devices', '/screen', '/logcat', '/shell'];
 
+// Binary-safe encoding for JSON tunnel
+function encodeArgs(args: any[]): any[] {
+  return args.map((arg) => {
+    if (Buffer.isBuffer(arg)) {
+      return { __bin: true, data: arg.toString('base64') };
+    }
+    return arg;
+  });
+}
+
+function decodeArgs(args: any[]): any[] {
+  return args.map((arg) => {
+    if (arg && typeof arg === 'object' && arg.__bin && typeof arg.data === 'string') {
+      return Buffer.from(arg.data, 'base64');
+    }
+    return arg;
+  });
+}
+
+/**
+ * SocketTunnel bridges Socket.IO events between the relay and the local server.
+ *
+ * For each remote client socket that connects via the relay, a corresponding
+ * local Socket.IO connection is created to the local server. Events flow
+ * bidirectionally through the agent's WebSocket tunnel to the relay.
+ */
 export class SocketTunnel {
   private localPort: number;
   private ws: WebSocket | null = null;
-  private localSockets: Map<string, Socket> = new Map();
-  // Maps remote socketId -> local socket for each namespace
-  private remoteToLocal: Map<string, Map<string, Socket>> = new Map();
+  // Map: "namespace:remoteSocketId" → local Socket.IO connection
+  private localSockets = new Map<string, Socket>();
 
   constructor(localPort: number) {
     this.localPort = localPort;
-    for (const ns of NAMESPACES) {
-      this.remoteToLocal.set(ns, new Map());
-    }
   }
 
   attach(ws: WebSocket): void {
     this.ws = ws;
-    this.connectLocalSockets();
   }
 
   detach(): void {
     this.ws = null;
-    for (const socket of this.localSockets.values()) {
+    for (const [key, socket] of this.localSockets) {
       socket.disconnect();
     }
     this.localSockets.clear();
-    for (const map of this.remoteToLocal.values()) {
-      map.clear();
-    }
   }
 
   handleConnect(msg: TunnelSocketConnect): void {
     if (msg.type === 'socket-connect') {
-      logger.debug(`Remote socket ${msg.socketId} connected to ${msg.namespace}`);
-      // The local socket is already connected per-namespace, we just track the remote ID
-      const nsMap = this.remoteToLocal.get(msg.namespace);
-      const localSocket = this.localSockets.get(msg.namespace);
-      if (nsMap && localSocket) {
-        nsMap.set(msg.socketId, localSocket);
-      }
+      this.createLocalSocket(msg.namespace, msg.socketId);
     } else if (msg.type === 'socket-disconnect') {
-      logger.debug(`Remote socket ${msg.socketId} disconnected from ${msg.namespace}`);
-      const nsMap = this.remoteToLocal.get(msg.namespace);
-      if (nsMap) {
-        nsMap.delete(msg.socketId);
-      }
+      this.destroyLocalSocket(msg.namespace, msg.socketId);
     }
   }
 
   handleEvent(msg: TunnelSocketEvent): void {
-    const localSocket = this.localSockets.get(msg.namespace);
-    if (localSocket) {
-      localSocket.emit(msg.event, ...msg.args);
-    } else {
-      logger.warn(`No local socket for namespace ${msg.namespace}`);
+    const key = `${msg.namespace}:${msg.socketId}`;
+    const localSocket = this.localSockets.get(key);
+
+    if (!localSocket) {
+      logger.warn(`No local socket for ${key}, event: ${msg.event}`);
+      return;
+    }
+
+    const decodedArgs = decodeArgs(msg.args);
+    localSocket.emit(msg.event, ...decodedArgs);
+  }
+
+  private createLocalSocket(namespace: string, remoteSocketId: string): void {
+    const key = `${namespace}:${remoteSocketId}`;
+
+    if (this.localSockets.has(key)) {
+      logger.warn(`Local socket already exists for ${key}`);
+      return;
+    }
+
+    if (!NAMESPACES.includes(namespace)) {
+      logger.warn(`Unknown namespace: ${namespace}`);
+      return;
+    }
+
+    const socket = io(`http://localhost:${this.localPort}${namespace}`, {
+      transports: ['websocket'],
+      reconnection: false,
+    });
+
+    // Forward all events from local server → relay → remote client
+    socket.onAny((event: string, ...args: any[]) => {
+      this.sendToRelay({
+        type: 'socket-event',
+        namespace,
+        socketId: remoteSocketId,
+        event,
+        args: encodeArgs(args),
+      });
+    });
+
+    socket.on('connect', () => {
+      logger.debug(`Socket tunnel: local ${key} connected`);
+    });
+
+    socket.on('disconnect', () => {
+      logger.debug(`Socket tunnel: local ${key} disconnected`);
+    });
+
+    this.localSockets.set(key, socket);
+  }
+
+  private destroyLocalSocket(namespace: string, remoteSocketId: string): void {
+    const key = `${namespace}:${remoteSocketId}`;
+    const socket = this.localSockets.get(key);
+
+    if (socket) {
+      socket.disconnect();
+      this.localSockets.delete(key);
+      logger.debug(`Socket tunnel: destroyed local ${key}`);
     }
   }
 
-  private connectLocalSockets(): void {
-    for (const ns of NAMESPACES) {
-      const socket = io(`http://localhost:${this.localPort}${ns}`, {
-        transports: ['websocket'],
-        reconnection: true,
-      });
-
-      socket.onAny((event: string, ...args: unknown[]) => {
-        this.forwardToRelay({
-          type: 'socket-event',
-          namespace: ns,
-          event,
-          args,
-        });
-      });
-
-      socket.on('connect', () => {
-        logger.debug(`Socket tunnel: local socket connected to ${ns}`);
-      });
-
-      socket.on('disconnect', () => {
-        logger.debug(`Socket tunnel: local socket disconnected from ${ns}`);
-      });
-
-      this.localSockets.set(ns, socket);
-    }
-  }
-
-  private forwardToRelay(msg: TunnelSocketEvent): void {
+  private sendToRelay(msg: TunnelSocketEvent): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     }

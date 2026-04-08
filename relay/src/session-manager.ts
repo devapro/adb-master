@@ -27,6 +27,7 @@ export class SessionManager {
       createdAt: Date.now(),
       lastActivity: Date.now(),
       pendingRequests: new Map(),
+      clientSockets: new Map(),
     };
 
     this.sessions.set(sessionId, session);

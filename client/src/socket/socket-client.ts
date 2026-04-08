@@ -9,10 +9,9 @@ function createSocketForMode(namespace: string): Socket {
 
   if (mode === 'remote' && relayUrl) {
     return io(`${relayUrl}${namespace}`, {
-      transports: ['polling'], // relay rejects WebSocket upgrades; polling is tunneled via HTTP
+      transports: ['websocket', 'polling'],
       autoConnect: false,
       query: { session: sessionId, password: password || '' },
-      extraHeaders: { 'x-relay-session': sessionId },
     });
   }
 

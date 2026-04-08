@@ -1,31 +1,165 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from './config';
 import { SessionManager } from './session-manager';
-import type { TunnelRequest, TunnelResponse, TunnelMessage } from './types';
+import type { TunnelRequest, TunnelResponse, TunnelMessage, TunnelSocketEvent, TunnelSocketConnect } from './types';
+
+const SOCKET_NAMESPACES = ['/devices', '/screen', '/logcat', '/shell'];
+
+// Binary-safe encoding: detect Buffers in args and encode as { __bin, data }
+function encodeArgs(args: any[]): any[] {
+  return args.map((arg) => {
+    if (Buffer.isBuffer(arg)) {
+      return { __bin: true, data: arg.toString('base64') };
+    }
+    if (arg instanceof ArrayBuffer) {
+      return { __bin: true, data: Buffer.from(new Uint8Array(arg)).toString('base64') };
+    }
+    if (arg instanceof Uint8Array) {
+      return { __bin: true, data: Buffer.from(arg).toString('base64') };
+    }
+    return arg;
+  });
+}
+
+function decodeArgs(args: any[]): any[] {
+  return args.map((arg) => {
+    if (arg && typeof arg === 'object' && arg.__bin && typeof arg.data === 'string') {
+      return Buffer.from(arg.data, 'base64');
+    }
+    return arg;
+  });
+}
 
 export class RelayServer {
   private app = express();
   private server: http.Server;
   private wss: WebSocketServer;
+  private io: SocketIOServer;
   private sessionManager = new SessionManager();
 
   constructor() {
     this.app.use(cors({ origin: config.corsOrigin }));
     this.app.use(express.json({ limit: '1mb' }));
 
-    this.setupRoutes();
-
     this.server = http.createServer(this.app);
-    this.wss = new WebSocketServer({ noServer: true });
 
+    // Socket.IO server for client connections (handles /socket.io/ upgrades)
+    this.io = new SocketIOServer(this.server, {
+      cors: { origin: '*' },
+      pingInterval: 25000,
+      pingTimeout: 20000,
+    });
+    this.setupSocketIO();
+
+    // Raw WebSocket for agent connections (noServer — we route upgrades manually)
+    this.wss = new WebSocketServer({ noServer: true });
     this.server.on('upgrade', (req, socket, head) => {
       this.handleUpgrade(req, socket, head);
     });
+
+    this.setupRoutes();
   }
+
+  // ─── Socket.IO: client ↔ agent event forwarding ───
+
+  private setupSocketIO(): void {
+    for (const ns of SOCKET_NAMESPACES) {
+      const nsp = this.io.of(ns);
+
+      // Auth middleware: validate session from query params
+      nsp.use((socket, next) => {
+        const sessionId = socket.handshake.query.session as string;
+        const password = (socket.handshake.query.password as string) || undefined;
+
+        if (!sessionId) {
+          return next(new Error('Missing session'));
+        }
+
+        if (!this.sessionManager.validateClient(sessionId, password)) {
+          return next(new Error('Invalid session or password'));
+        }
+
+        const session = this.sessionManager.getSession(sessionId);
+        if (!session || !session.agentWs || session.agentWs.readyState !== WebSocket.OPEN) {
+          return next(new Error('Agent not connected'));
+        }
+
+        socket.data.sessionId = sessionId;
+        next();
+      });
+
+      nsp.on('connection', (socket) => {
+        const sessionId = socket.data.sessionId as string;
+        const session = this.sessionManager.getSession(sessionId);
+        if (!session) { socket.disconnect(); return; }
+
+        // Track this client socket
+        session.clientSockets.set(socket.id, socket);
+
+        // Notify agent: new client socket connected
+        this.sendToAgent(session.agentWs!, {
+          type: 'socket-connect',
+          namespace: ns,
+          socketId: socket.id,
+        });
+
+        // Forward all client events → agent
+        socket.onAny((event: string, ...args: any[]) => {
+          const currentSession = this.sessionManager.getSession(sessionId);
+          if (!currentSession?.agentWs || currentSession.agentWs.readyState !== WebSocket.OPEN) return;
+
+          const msg: TunnelSocketEvent = {
+            type: 'socket-event',
+            namespace: ns,
+            socketId: socket.id,
+            event,
+            args: encodeArgs(args),
+          };
+          currentSession.agentWs.send(JSON.stringify(msg));
+        });
+
+        socket.on('disconnect', () => {
+          const currentSession = this.sessionManager.getSession(sessionId);
+          if (currentSession) {
+            currentSession.clientSockets.delete(socket.id);
+
+            if (currentSession.agentWs && currentSession.agentWs.readyState === WebSocket.OPEN) {
+              this.sendToAgent(currentSession.agentWs, {
+                type: 'socket-disconnect',
+                namespace: ns,
+                socketId: socket.id,
+              });
+            }
+          }
+        });
+      });
+    }
+  }
+
+  // Forward agent socket-event → correct client socket
+  private handleAgentSocketEvent(sessionId: string, msg: TunnelSocketEvent): void {
+    const session = this.sessionManager.getSession(sessionId);
+    if (!session) return;
+
+    const clientSocket = session.clientSockets.get(msg.socketId);
+    if (!clientSocket) return;
+
+    const decodedArgs = decodeArgs(msg.args);
+
+    // Use volatile for screen frames to drop if client is slow
+    if (msg.namespace === '/screen' && msg.event === 'screen:frame') {
+      clientSocket.volatile.emit(msg.event, ...decodedArgs);
+    } else {
+      clientSocket.emit(msg.event, ...decodedArgs);
+    }
+  }
+
+  // ─── HTTP routes ───
 
   private setupRoutes(): void {
     this.app.post('/relay/sessions', (req, res) => {
@@ -72,6 +206,7 @@ export class RelayServer {
       });
     });
 
+    // HTTP tunnel middleware — tunnels REST API calls to agent
     this.app.use((req, res, next) => {
       const sessionId = req.headers['x-relay-session'] as string | undefined;
       if (!sessionId) {
@@ -83,12 +218,14 @@ export class RelayServer {
     });
   }
 
+  // ─── Agent WebSocket (raw WS, not Socket.IO) ───
+
   private handleUpgrade(req: http.IncomingMessage, socket: any, head: Buffer): void {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const match = url.pathname.match(/^\/relay\/agent\/([^/]+)$/);
 
     if (!match) {
-      socket.destroy();
+      // Not an agent upgrade — let Socket.IO handle its own /socket.io/ upgrades
       return;
     }
 
@@ -125,15 +262,23 @@ export class RelayServer {
 
         session.lastActivity = Date.now();
 
-        if (message.type === 'http-response') {
-          const pending = session.pendingRequests.get(message.requestId);
-          if (pending) {
-            clearTimeout(pending.timer);
-            session.pendingRequests.delete(message.requestId);
-            pending.resolve(message);
+        switch (message.type) {
+          case 'http-response': {
+            const pending = session.pendingRequests.get(message.requestId);
+            if (pending) {
+              clearTimeout(pending.timer);
+              session.pendingRequests.delete(message.requestId);
+              pending.resolve(message);
+            }
+            break;
           }
-        } else if (message.type === 'pong') {
-          // keepalive acknowledged
+          case 'socket-event':
+            this.handleAgentSocketEvent(sessionId, message as TunnelSocketEvent);
+            break;
+          case 'pong':
+            break;
+          default:
+            break;
         }
       } catch (err) {
         console.error(`Invalid message from agent (session ${sessionId}):`, err);
@@ -144,6 +289,15 @@ export class RelayServer {
       console.log(`Agent disconnected for session: ${sessionId}`);
       clearInterval(pingInterval);
       this.sessionManager.removeAgentConnection(sessionId);
+
+      // Disconnect all client sockets for this session
+      const session = this.sessionManager.getSession(sessionId);
+      if (session) {
+        for (const [, sock] of session.clientSockets) {
+          sock.disconnect(true);
+        }
+        session.clientSockets.clear();
+      }
     });
 
     ws.on('error', (err) => {
@@ -152,6 +306,14 @@ export class RelayServer {
       this.sessionManager.removeAgentConnection(sessionId);
     });
   }
+
+  private sendToAgent(ws: WebSocket, msg: TunnelMessage): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+    }
+  }
+
+  // ─── HTTP tunnel ───
 
   private async handleTunnelRequest(
     req: express.Request,
@@ -256,12 +418,14 @@ export class RelayServer {
       console.log(`Relay server listening on port ${config.port}`);
       console.log(`Session management: POST http://localhost:${config.port}/relay/sessions`);
       console.log(`Agent WebSocket: ws://localhost:${config.port}/relay/agent/:sessionId?secret=...`);
+      console.log(`Socket.IO namespaces: ${SOCKET_NAMESPACES.join(', ')}`);
     });
   }
 
   stop(): Promise<void> {
     return new Promise((resolve) => {
       this.sessionManager.destroy();
+      this.io.close();
       this.wss.close(() => {
         this.server.close(() => {
           resolve();

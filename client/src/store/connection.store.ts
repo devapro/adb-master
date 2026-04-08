@@ -31,7 +31,7 @@ function loadPersistedState(): Pick<ConnectionState, 'mode' | 'relayUrl' | 'sess
   return { mode: 'local', relayUrl: '', sessionId: '', password: '' };
 }
 
-function persist(state: Pick<ConnectionState, 'mode' | 'relayUrl' | 'sessionId'>) {
+function persist(state: Pick<ConnectionState, 'mode' | 'relayUrl' | 'sessionId' | 'password'>) {
   localStorage.setItem('connection', JSON.stringify(state));
 }
 

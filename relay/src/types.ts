@@ -1,3 +1,6 @@
+import type { WebSocket } from 'ws';
+import type { Socket as IOSocket } from 'socket.io';
+
 export interface TunnelRequest {
   type: 'http-request';
   requestId: string;
@@ -18,9 +21,9 @@ export interface TunnelResponse {
 export interface TunnelSocketEvent {
   type: 'socket-event';
   namespace: string;
+  socketId: string;
   event: string;
-  args: any[];
-  socketId?: string;
+  args: any[]; // binary data encoded as { __bin: true, data: "<base64>" }
 }
 
 export interface TunnelSocketConnect {
@@ -39,7 +42,7 @@ export interface Session {
   id: string;
   secret: string;
   password?: string;
-  agentWs: import('ws').WebSocket | null;
+  agentWs: WebSocket | null;
   createdAt: number;
   lastActivity: number;
   pendingRequests: Map<string, {
@@ -47,4 +50,5 @@ export interface Session {
     reject: (error: Error) => void;
     timer: NodeJS.Timeout;
   }>;
+  clientSockets: Map<string, IOSocket>; // remoteSocketId → Socket.IO socket
 }
