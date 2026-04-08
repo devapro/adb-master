@@ -76,6 +76,7 @@
       "stop": "Force Stop",
       "launch": "Launch",
       "clear": "Clear Data",
+      "clearCache": "Clear Cache",
       "extractApk": "APK",
       "backup": "Backup",
       "restore": "Restore",

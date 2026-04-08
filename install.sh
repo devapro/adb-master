@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
+# install.sh — installs ADB Master without git or Homebrew
+# Requirements: curl, tar (standard on macOS and any Linux distro)
 set -euo pipefail
 
-REPO_URL="https://github.com/devapro/adb-master.git"
+REPO_ARCHIVE="https://github.com/devapro/adb-master/archive/refs/heads/main.tar.gz"
 INSTALL_DIR="adb-master"
-NODE_MIN_MAJOR=20
+NODE_LTS_MAJOR=22
 
 # ── colours ────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -13,20 +15,8 @@ info()    { echo -e "${CYAN}[info]${RESET} $*"; }
 success() { echo -e "${GREEN}[ok]${RESET}  $*"; }
 warn()    { echo -e "${YELLOW}[warn]${RESET} $*"; }
 die()     { echo -e "${RED}[error]${RESET} $*" >&2; exit 1; }
+have()    { command -v "$1" &>/dev/null; }
 
-# ── detect OS ──────────────────────────────────────────────────────────────
-case "$(uname -s)" in
-  Darwin) OS=mac ;;
-  Linux)  OS=linux ;;
-  *)      die "Unsupported OS: $(uname -s). On Windows, use WSL or Docker." ;;
-esac
-info "Detected OS: ${OS}"
-
-# ── helpers ────────────────────────────────────────────────────────────────
-have() { command -v "$1" &>/dev/null; }
-
-# Pipe-safe prompt: when running via `curl | bash`, stdin is the script,
-# so we read from /dev/tty to get actual user input.
 ask() {
   local prompt="$1" varname="$2" default="${3:-}"
   if [[ -t 0 ]]; then
@@ -37,99 +27,112 @@ ask() {
   eval "$varname=\${$varname:-$default}"
 }
 
-install_brew() {
-  if ! have brew; then
-    info "Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # add brew to PATH for the rest of this script
-    if [[ -x /opt/homebrew/bin/brew ]]; then
-      eval "$(/opt/homebrew/bin/brew shellenv)"
-    elif [[ -x /usr/local/bin/brew ]]; then
-      eval "$(/usr/local/bin/brew shellenv)"
-    fi
-  fi
-}
+# ── verify minimal requirements ────────────────────────────────────────────
+for cmd in curl tar; do
+  have "$cmd" || die "'$cmd' is required but not found (should be available on any standard system)"
+done
 
-# ── install git ────────────────────────────────────────────────────────────
-if have git; then
-  success "git already installed: $(git --version)"
-else
-  info "Installing git..."
-  if [[ "$OS" == "mac" ]]; then
-    install_brew
-    brew install git
-  else
-    if have apt-get; then
-      sudo apt-get update -qq && sudo apt-get install -y git
-    elif have dnf; then
-      sudo dnf install -y git
-    elif have yum; then
-      sudo yum install -y git
-    elif have pacman; then
-      sudo pacman -Sy --noconfirm git
-    else
-      die "Cannot install git: no supported package manager found (apt/dnf/yum/pacman)"
-    fi
-  fi
-  success "git installed: $(git --version)"
-fi
+# ── detect OS + architecture ───────────────────────────────────────────────
+case "$(uname -s)" in
+  Darwin) NODE_OS=darwin ;;
+  Linux)  NODE_OS=linux  ;;
+  *)      die "Unsupported OS: $(uname -s). On Windows use WSL or Docker." ;;
+esac
 
-# ── install Node.js ────────────────────────────────────────────────────────
-need_node=true
+case "$(uname -m)" in
+  x86_64|amd64)  NODE_ARCH=x64   ;;
+  arm64|aarch64) NODE_ARCH=arm64 ;;
+  armv7l)        NODE_ARCH=armv7l ;;
+  *)             die "Unsupported architecture: $(uname -m)" ;;
+esac
+
+info "Platform: ${NODE_OS}/${NODE_ARCH}"
+
+# ── temp dir (auto-cleaned on exit) ───────────────────────────────────────
+TEMP=$(mktemp -d)
+trap 'rm -rf "$TEMP"' EXIT
+
+# ── find or download Node.js ───────────────────────────────────────────────
+NODE_LOCAL="${INSTALL_DIR}/.nodejs"
+NODE_BIN=""
+NPM_BIN=""
+
+# 1. Try system Node.js
 if have node; then
-  current_major=$(node -e 'process.stdout.write(process.versions.node.split(".")[0])')
-  if (( current_major >= NODE_MIN_MAJOR )); then
-    success "Node.js already installed: $(node --version)"
-    need_node=false
+  cur=$(node -e 'process.stdout.write(process.versions.node.split(".")[0])')
+  if (( cur >= NODE_LTS_MAJOR )); then
+    NODE_BIN="$(command -v node)"
+    NPM_BIN="$(command -v npm)"
+    success "Using system Node.js: $(node --version)"
   else
-    warn "Node.js $(node --version) is too old (need >= v${NODE_MIN_MAJOR}). Installing a newer version..."
+    warn "System Node.js $(node --version) is too old (need >= v${NODE_LTS_MAJOR})."
   fi
 fi
 
-if $need_node; then
-  info "Installing Node.js v${NODE_MIN_MAJOR}+..."
-  if [[ "$OS" == "mac" ]]; then
-    install_brew
-    brew install node
-  else
-    if have apt-get; then
-      if have curl; then
-        info "Setting up NodeSource repository..."
-        curl -fsSL "https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x" | sudo -E bash - \
-          || die "Failed to set up NodeSource repository. Install Node.js >= v${NODE_MIN_MAJOR} manually: https://nodejs.org"
-      fi
-      sudo apt-get install -y nodejs
-    elif have dnf; then
-      sudo dnf module install -y "nodejs:${NODE_MIN_MAJOR}" \
-        || { warn "dnf module failed, trying default nodejs package..."; sudo dnf install -y nodejs; }
-    elif have yum; then
-      sudo yum install -y nodejs
-    elif have pacman; then
-      sudo pacman -Sy --noconfirm nodejs npm
-    else
-      die "Cannot install Node.js: no supported package manager found. Install manually: https://nodejs.org"
-    fi
+# 2. Try previously downloaded Node.js
+if [[ -z "$NODE_BIN" && -x "${NODE_LOCAL}/bin/node" ]]; then
+  cur=$("${NODE_LOCAL}/bin/node" -e 'process.stdout.write(process.versions.node.split(".")[0])')
+  if (( cur >= NODE_LTS_MAJOR )); then
+    NODE_BIN="${NODE_LOCAL}/bin/node"
+    NPM_BIN="${NODE_LOCAL}/bin/npm"
+    success "Using previously downloaded Node.js: $("${NODE_BIN}" --version)"
   fi
-  success "Node.js installed: $(node --version)"
 fi
 
-success "npm: $(npm --version)"
+# 3. Download Node.js binary
+if [[ -z "$NODE_BIN" ]]; then
+  info "Fetching latest Node.js v${NODE_LTS_MAJOR} LTS..."
+  NODE_VER=$(curl -fsSL "https://nodejs.org/dist/latest-v${NODE_LTS_MAJOR}.x/SHASUMS256.txt" \
+    | grep -oE "node-v[0-9.]+-${NODE_OS}-${NODE_ARCH}\.tar\.gz" \
+    | head -1 \
+    | grep -oE 'v[0-9.]+')
+  [[ -z "$NODE_VER" ]] && die "Could not resolve Node.js v${NODE_LTS_MAJOR} version."
 
-# ── clone repo ─────────────────────────────────────────────────────────────
-if [[ -d "$INSTALL_DIR/.git" ]]; then
-  warn "Directory '${INSTALL_DIR}' already exists. Pulling latest changes..."
-  git -C "$INSTALL_DIR" pull
+  NODE_FILE="node-${NODE_VER}-${NODE_OS}-${NODE_ARCH}.tar.gz"
+  NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_FILE}"
+
+  info "Downloading Node.js ${NODE_VER}..."
+  curl -fSL --progress-bar -o "${TEMP}/${NODE_FILE}" "$NODE_URL"
+
+  info "Extracting Node.js..."
+  tar -xzf "${TEMP}/${NODE_FILE}" -C "$TEMP"
+  # stage for moving after project is extracted (so INSTALL_DIR exists)
+  DOWNLOADED_NODE="${TEMP}/node-${NODE_VER}-${NODE_OS}-${NODE_ARCH}"
+  success "Node.js ${NODE_VER} ready"
+fi
+
+# ── download project ────────────────────────────────────────────────────────
+if [[ -f "${INSTALL_DIR}/package.json" ]]; then
+  warn "Directory '${INSTALL_DIR}' already exists — skipping download."
 else
-  info "Cloning ${REPO_URL}..."
-  git clone "$REPO_URL" "$INSTALL_DIR"
+  info "Downloading ADB Master..."
+  curl -fSL --progress-bar -o "${TEMP}/adb-master.tar.gz" "$REPO_ARCHIVE"
+
+  info "Extracting project..."
+  tar -xzf "${TEMP}/adb-master.tar.gz" -C "$TEMP"
+
+  # GitHub archives extract as "<repo>-<branch>/"
+  EXTRACTED=$(find "$TEMP" -maxdepth 1 -type d -name "adb-master-*" | head -1)
+  [[ -z "$EXTRACTED" ]] && die "Unexpected archive structure — cannot find extracted project folder."
+  mv "$EXTRACTED" "$INSTALL_DIR"
+  success "Project downloaded to '${INSTALL_DIR}/'"
 fi
 
-# ── install ADB (after clone, so install-adb.sh is available) ─────────────
+# ── move downloaded Node.js into project dir ───────────────────────────────
+if [[ -n "${DOWNLOADED_NODE:-}" ]]; then
+  mkdir -p "$NODE_LOCAL"
+  cp -r "${DOWNLOADED_NODE}/." "$NODE_LOCAL/"
+  NODE_BIN="${NODE_LOCAL}/bin/node"
+  NPM_BIN="${NODE_LOCAL}/bin/npm"
+  success "Node.js installed to '${NODE_LOCAL}/'"
+fi
+
+# ── install ADB ────────────────────────────────────────────────────────────
 if have adb; then
   success "adb already installed: $(adb version | head -1)"
 else
-  warn "adb is not installed."
-  ADB_SCRIPT="$INSTALL_DIR/install-adb.sh"
+  warn "adb not found."
+  ADB_SCRIPT="${INSTALL_DIR}/install-adb.sh"
   if [[ -f "$ADB_SCRIPT" ]]; then
     ask "$(echo -e "${CYAN}[info]${RESET} Install ADB now? [Y/n] ")" answer "y"
     if [[ "${answer}" =~ ^[Yy]$ ]]; then
@@ -142,19 +145,49 @@ else
   fi
 fi
 
-# ── install dependencies ───────────────────────────────────────────────────
+# ── install npm dependencies + build ──────────────────────────────────────
 info "Installing npm dependencies..."
-npm install --prefix "$INSTALL_DIR"
+(cd "$INSTALL_DIR" && "$NPM_BIN" install)
 
-# ── build for production ──────────────────────────────────────────────────
 info "Building ADB Master..."
-npm run build --prefix "$INSTALL_DIR"
+(cd "$INSTALL_DIR" && "$NPM_BIN" run build)
+
+# ── create launcher script if using local Node.js ─────────────────────────
+LAUNCHER="${INSTALL_DIR}/start.sh"
+if [[ "$NODE_BIN" == "${NODE_LOCAL}/bin/node" ]]; then
+  cat > "$LAUNCHER" << 'LAUNCHER_EOF'
+#!/usr/bin/env bash
+# Starts ADB Master using the bundled Node.js installation
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="${DIR}/.nodejs/bin:${PATH}"
+exec npm start
+LAUNCHER_EOF
+  chmod +x "$LAUNCHER"
+
+  DEV_LAUNCHER="${INSTALL_DIR}/dev.sh"
+  cat > "$DEV_LAUNCHER" << 'LAUNCHER_EOF'
+#!/usr/bin/env bash
+# Starts ADB Master in development mode using the bundled Node.js installation
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="${DIR}/.nodejs/bin:${PATH}"
+exec npm run dev
+LAUNCHER_EOF
+  chmod +x "$DEV_LAUNCHER"
+fi
 
 # ── done ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${GREEN}Installation complete!${RESET}"
 echo ""
 echo -e "  ${BOLD}cd ${INSTALL_DIR}${RESET}"
-echo -e "  ${BOLD}npm start${RESET}       — production mode  (http://localhost:3000)"
-echo -e "  ${BOLD}npm run dev${RESET}     — development mode (server :3000 + client :5173)"
+if [[ -f "$LAUNCHER" ]]; then
+  echo -e "  ${BOLD}./start.sh${RESET}     — production mode  (http://localhost:3000)"
+  echo -e "  ${BOLD}./dev.sh${RESET}       — development mode (server :3000 + client :5173)"
+  echo ""
+  echo -e "  Or add the bundled Node.js to your PATH permanently:"
+  echo -e "  ${BOLD}export PATH=\"\$HOME/$(realpath --relative-to="$HOME" "${INSTALL_DIR}" 2>/dev/null || echo "${INSTALL_DIR}")/.nodejs/bin:\$PATH\"${RESET}"
+else
+  echo -e "  ${BOLD}npm start${RESET}      — production mode  (http://localhost:3000)"
+  echo -e "  ${BOLD}npm run dev${RESET}    — development mode (server :3000 + client :5173)"
+fi
 echo ""

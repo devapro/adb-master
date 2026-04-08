@@ -38,6 +38,9 @@ export const stopApp = (serial: string, packageName: string) =>
 export const clearAppData = (serial: string, packageName: string) =>
   api.post<ApiResponse<AppActionResult>>(`/devices/${serial}/apps/${packageName}/clear`).then((r) => r.data.data);
 
+export const clearAppCache = (serial: string, packageName: string) =>
+  api.post<ApiResponse<AppActionResult>>(`/devices/${serial}/apps/${packageName}/clear-cache`).then((r) => r.data.data);
+
 export const launchApp = (serial: string, packageName: string) =>
   api.post<ApiResponse<AppActionResult>>(`/devices/${serial}/apps/${packageName}/launch`).then((r) => r.data.data);
 

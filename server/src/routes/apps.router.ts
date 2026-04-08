@@ -151,6 +151,22 @@ router.post(
 );
 
 router.post(
+  '/:serial/apps/:packageName/clear-cache',
+  deviceGuard,
+  validate(packageNameParam, 'params'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const serial = req.params.serial as string;
+      const packageName = req.params.packageName as string;
+      const result = await appService.clearCache(serial, packageName);
+      res.json({ data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
   '/:serial/apps/:packageName/launch',
   deviceGuard,
   validate(packageNameParam, 'params'),

@@ -14,7 +14,7 @@ export interface AppInfo {
 
 export interface AppActionResult {
   success: boolean;
-  action: 'install' | 'uninstall' | 'disable' | 'force-stop' | 'clear-data' | 'launch' | 'grant' | 'revoke' | 'backup' | 'restore';
+  action: 'install' | 'uninstall' | 'disable' | 'force-stop' | 'clear-data' | 'clear-cache' | 'launch' | 'grant' | 'revoke' | 'backup' | 'restore';
   message: string;
 }
 

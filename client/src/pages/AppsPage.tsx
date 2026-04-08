@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppInfo, AppType, AppPermission } from '../types';
-import { getApps, uninstallApp, disableApp, stopApp, installApk, clearAppData, launchApp, extractApk, backupApp, restoreApp, getPermissions, grantPermission, revokePermission } from '../api/apps.api';
+import { getApps, uninstallApp, disableApp, stopApp, installApk, clearAppData, clearAppCache, launchApp, extractApk, backupApp, restoreApp, getPermissions, grantPermission, revokePermission } from '../api/apps.api';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { SearchInput } from '../components/common/SearchInput';
@@ -63,7 +63,7 @@ export const AppsPage: React.FC = () => {
     });
   }, [apps, search, typeFilter]);
 
-  const handleAction = async (action: 'remove' | 'disable' | 'stop' | 'clear' | 'launch' | 'extractApk' | 'backup' | 'restore', app: AppInfo) => {
+  const handleAction = async (action: 'remove' | 'disable' | 'stop' | 'clear' | 'clearCache' | 'launch' | 'extractApk' | 'backup' | 'restore', app: AppInfo) => {
     if (!serial) return;
     if (action === 'remove') {
       setModal({ type: 'remove', app });
@@ -87,6 +87,9 @@ export const AppsPage: React.FC = () => {
         showToast(result.message, result.success ? 'success' : 'error');
       } else if (action === 'clear') {
         const result = await clearAppData(serial, app.packageName);
+        showToast(result.message, result.success ? 'success' : 'error');
+      } else if (action === 'clearCache') {
+        const result = await clearAppCache(serial, app.packageName);
         showToast(result.message, result.success ? 'success' : 'error');
       } else if (action === 'extractApk') {
         await extractApk(serial, app.packageName);
@@ -280,6 +283,9 @@ export const AppsPage: React.FC = () => {
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => handleAction('stop', app)}>
                   {t('apps.actions.stop')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handleAction('clearCache', app)}>
+                  {t('apps.actions.clearCache')}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => handleAction('clear', app)}>
                   {t('apps.actions.clear')}

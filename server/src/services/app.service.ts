@@ -15,99 +15,150 @@ class AppService {
       .map((l) => {
         const match = l.match(/^package:(.+?)=(.+)$/);
         if (!match) return null;
-        return { apkPath: match[1], packageName: match[2] };
+        return { apkPath: match[1], packageName: match[2].trim() };
       })
       .filter((p): p is { apkPath: string; packageName: string } => p !== null);
 
-    const BATCH = 10;
+    // Batch-fetch all sizes in a few ADB calls instead of 2 per package
+    const sizeMap = await this.batchGetSizes(serial, packages);
+
+    // Batch-fetch dumpsys info using shell for-loops (20 packages per ADB call)
+    const BATCH = 20;
     const apps: AppInfo[] = [];
     for (let i = 0; i < packages.length; i += BATCH) {
       const batch = packages.slice(i, i + BATCH);
-      const results = await Promise.all(
-        batch.map((pkg) => this.getAppDetail(serial, pkg.packageName, pkg.apkPath))
-      );
-      apps.push(...results.filter((a): a is AppInfo => a !== null));
+      const dumpMap = await this.batchGetDumpsys(serial, batch.map((p) => p.packageName));
+      for (const pkg of batch) {
+        const dump = dumpMap.get(pkg.packageName) || '';
+        const sizes = sizeMap.get(pkg.packageName) || { total: 0, data: 0, cache: 0 };
+        apps.push(this.parseAppDetail(pkg.packageName, pkg.apkPath, dump, sizes));
+      }
     }
 
     return apps;
   }
 
-  private async getAppDetail(
-    serial: string,
+  private parseAppDetail(
     packageName: string,
-    apkPath: string
-  ): Promise<AppInfo | null> {
-    try {
-      const [dumpResult, sizes] = await Promise.all([
-        adbService.shell(serial, `dumpsys package ${packageName}`),
-        this.getAppSize(serial, packageName, apkPath),
-      ]);
-      const dump = dumpResult.stdout;
+    apkPath: string,
+    dump: string,
+    sizes: { total: number; data: number; cache: number }
+  ): AppInfo {
+    const versionName = this.extractField(dump, 'versionName') || '';
+    const enabled = !dump.includes('enabled=2') && !dump.includes('enabled=3');
 
-      const versionName = this.extractField(dump, 'versionName') || '';
-      const enabled = !dump.includes('enabled=2') && !dump.includes('enabled=3');
-
-      let appType: AppType = 'user';
-      if (apkPath.startsWith('/system/')) {
-        appType = 'system';
-      } else if (apkPath.startsWith('/product/') || apkPath.startsWith('/vendor/')) {
-        appType = 'preinstalled';
-      }
-
-      // Extract label from dumpsys output — avoids a separate ADB call
-      const labelMatch = dump.match(/non-localized-label:(.+)/);
-      const appName = (labelMatch ? labelMatch[1].trim() : null) || packageName;
-
-      return {
-        packageName,
-        appName,
-        versionName,
-        type: appType,
-        sizeBytes: sizes.total,
-        dataSizeBytes: sizes.data,
-        cacheSizeBytes: sizes.cache,
-        iconBase64: null,
-        enabled,
-      };
-    } catch {
-      return {
-        packageName,
-        appName: packageName,
-        versionName: '',
-        type: 'user',
-        sizeBytes: 0,
-        dataSizeBytes: 0,
-        cacheSizeBytes: 0,
-        iconBase64: null,
-        enabled: true,
-      };
+    let appType: AppType = 'user';
+    if (apkPath.startsWith('/system/')) {
+      appType = 'system';
+    } else if (apkPath.startsWith('/product/') || apkPath.startsWith('/vendor/')) {
+      appType = 'preinstalled';
     }
+
+    const labelMatch = dump.match(/non-localized-label:(.+)/);
+    const appName = (labelMatch ? labelMatch[1].trim() : null) || packageName;
+
+    return {
+      packageName,
+      appName,
+      versionName,
+      type: appType,
+      sizeBytes: sizes.total,
+      dataSizeBytes: sizes.data,
+      cacheSizeBytes: sizes.cache,
+      iconBase64: null,
+      enabled,
+    };
   }
 
-  private async getAppSize(
+  /**
+   * Fetch dumpsys for multiple packages in a single ADB shell call.
+   * Uses a for-loop with grep to extract only the fields we need,
+   * keeping output small and fast.
+   */
+  private async batchGetDumpsys(
     serial: string,
-    packageName: string,
-    apkPath: string
-  ): Promise<{ total: number; data: number; cache: number }> {
+    packageNames: string[]
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (packageNames.length === 0) return map;
+
     try {
-      const [sizeResult, duResult] = await Promise.all([
-        adbService.shell(serial, `stat -c %s "${apkPath}" 2>/dev/null || echo 0`),
-        adbService.shell(
-          serial,
-          `du -s /data/data/${packageName} /data/data/${packageName}/cache 2>/dev/null; true`
-        ),
-      ]);
+      const pkgList = packageNames.join(' ');
+      const cmd = `for pkg in ${pkgList}; do echo "===PKG:$pkg==="; dumpsys package $pkg 2>/dev/null | grep -E 'versionName|enabled=|non-localized-label' | head -5; done`;
+      const result = await adbService.shell(serial, cmd);
 
-      const total = parseInt(sizeResult.stdout.trim(), 10) || 0;
-
-      const duLines = duResult.stdout.trim().split('\n');
-      const data = (parseInt(duLines[0]?.split(/\s/)[0] || '0', 10) || 0) * 1024;
-      const cache = (parseInt(duLines[1]?.split(/\s/)[0] || '0', 10) || 0) * 1024;
-
-      return { total, data, cache };
+      let currentPkg = '';
+      let currentDump = '';
+      for (const line of result.stdout.split('\n')) {
+        const marker = line.match(/^===PKG:(.+)===$/);
+        if (marker) {
+          if (currentPkg) map.set(currentPkg, currentDump);
+          currentPkg = marker[1];
+          currentDump = '';
+        } else {
+          currentDump += line + '\n';
+        }
+      }
+      if (currentPkg) map.set(currentPkg, currentDump);
     } catch {
-      return { total: 0, data: 0, cache: 0 };
+      // On failure, return empty map — apps will get default values
     }
+
+    return map;
+  }
+
+  /**
+   * Batch-fetch sizes for all packages using bulk du/stat commands.
+   * Reduces ~400 ADB calls to ~4.
+   */
+  private async batchGetSizes(
+    serial: string,
+    packages: { apkPath: string; packageName: string }[]
+  ): Promise<Map<string, { total: number; data: number; cache: number }>> {
+    const map = new Map<string, { total: number; data: number; cache: number }>();
+
+    try {
+      // Batch stat APK sizes — chunk paths to avoid ARG_MAX
+      const apkSizeByPath = new Map<string, number>();
+      const STAT_CHUNK = 50;
+      for (let i = 0; i < packages.length; i += STAT_CHUNK) {
+        const chunk = packages.slice(i, i + STAT_CHUNK);
+        const paths = chunk.map((p) => `"${p.apkPath}"`).join(' ');
+        const result = await adbService.shell(serial, `stat -c '%s %n' ${paths} 2>/dev/null; true`);
+        for (const line of result.stdout.split('\n')) {
+          const match = line.match(/^(\d+)\s+(.+)$/);
+          if (match) apkSizeByPath.set(match[2].trim(), parseInt(match[1], 10));
+        }
+      }
+
+      // Batch du for all data directories (1 ADB call)
+      const dataSizeByPkg = new Map<string, number>();
+      const duData = await adbService.shell(serial, 'du -s /data/data/*/ 2>/dev/null; true');
+      for (const line of duData.stdout.split('\n')) {
+        const match = line.match(/^(\d+)\s+\/data\/data\/([^/]+)/);
+        if (match) dataSizeByPkg.set(match[2], (parseInt(match[1], 10) || 0) * 1024);
+      }
+
+      // Batch du for all cache directories (1 ADB call)
+      const cacheSizeByPkg = new Map<string, number>();
+      const duCache = await adbService.shell(serial, 'du -s /data/data/*/cache 2>/dev/null; true');
+      for (const line of duCache.stdout.split('\n')) {
+        const match = line.match(/^(\d+)\s+\/data\/data\/([^/]+)/);
+        if (match) cacheSizeByPkg.set(match[2], (parseInt(match[1], 10) || 0) * 1024);
+      }
+
+      for (const pkg of packages) {
+        map.set(pkg.packageName, {
+          total: apkSizeByPath.get(pkg.apkPath) || 0,
+          data: dataSizeByPkg.get(pkg.packageName) || 0,
+          cache: cacheSizeByPkg.get(pkg.packageName) || 0,
+        });
+      }
+    } catch {
+      // On failure, sizes remain 0
+    }
+
+    return map;
   }
 
   private extractField(dump: string, field: string): string | null {
@@ -167,6 +218,31 @@ class AppService {
       success,
       action: 'clear-data',
       message: success ? 'App data cleared successfully' : `Failed to clear data: ${result.stderr || result.stdout}`,
+    };
+  }
+
+  async clearCache(serial: string, packageName: string): Promise<AppActionResult> {
+    // run-as works for debuggable apps; direct rm may work on rooted devices
+    const result = await adbService.shell(
+      serial,
+      `run-as ${packageName} sh -c 'rm -rf ./cache/* ./code_cache/* 2>/dev/null' 2>/dev/null && echo __CACHE_OK__`
+    );
+    if (result.stdout.includes('__CACHE_OK__')) {
+      return { success: true, action: 'clear-cache', message: 'App cache cleared successfully' };
+    }
+
+    const fallback = await adbService.shell(
+      serial,
+      `rm -rf /data/data/${packageName}/cache/* /data/data/${packageName}/code_cache/* 2>/dev/null && echo __CACHE_OK__`
+    );
+    if (fallback.stdout.includes('__CACHE_OK__')) {
+      return { success: true, action: 'clear-cache', message: 'App cache cleared successfully' };
+    }
+
+    return {
+      success: false,
+      action: 'clear-cache',
+      message: 'Cannot clear cache only — use Clear Data to clear everything',
     };
   }
 
