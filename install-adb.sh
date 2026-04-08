@@ -16,7 +16,11 @@ die()     { echo -e "${RED}[error]${RESET} $*" >&2; exit 1; }
 # ── check if already installed ─────────────────────────────────────────────
 if command -v adb &>/dev/null; then
   success "adb is already installed: $(adb version | head -1)"
-  read -rp "$(echo -e "${CYAN}[info]${RESET} Reinstall/update? [y/N] ")" answer
+  if [[ -t 0 ]]; then
+    read -rp "$(echo -e "${CYAN}[info]${RESET} Reinstall/update? [y/N] ")" answer
+  else
+    read -rp "$(echo -e "${CYAN}[info]${RESET} Reinstall/update? [y/N] ")" answer < /dev/tty || true
+  fi
   if [[ ! "${answer:-n}" =~ ^[Yy]$ ]]; then
     info "Skipping. Current installation kept."
     exit 0

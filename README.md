@@ -74,14 +74,16 @@ Monorepo with npm workspaces: `server/`, `client/`, and `relay/`.
 
 ## Prerequisites
 
-- **Node.js** >= 18
+- **Node.js** >= 20
 - **ADB** installed and on PATH (`adb version` should work)
+
+> **Windows users:** Use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or [Docker](#docker-deployment). The install script supports Mac and Linux only.
 
 ## Installation
 
-### One-liner (Mac or Linux)
+### Quick Install (Mac / Linux)
 
-Installs git and Node.js if missing, clones the repo, and runs `npm install`:
+Installs git, Node.js, and ADB if missing, clones the repo, builds, and is ready to run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/devapro/adb-master/main/install.sh | bash
@@ -98,8 +100,10 @@ Then start:
 
 ```bash
 cd adb-master
-npm run dev
+npm start
 ```
+
+Open `http://localhost:3000` — the server serves both the API and the web UI.
 
 ### Manual
 
@@ -107,27 +111,28 @@ npm run dev
 git clone https://github.com/devapro/adb-master.git
 cd adb-master
 npm install
-npm run dev
+npm run build
+npm start
 ```
 
-## Quick Start
+### Development Mode
+
+If you want to develop or modify the code, use dev mode instead — it enables hot-reload for both server and client:
 
 ```bash
-# Install dependencies
-npm install
-
-# Start both server and client in dev mode
 npm run dev
 ```
 
-- Server: `http://localhost:3000`
+- Server: `http://localhost:3000` (API only)
 - Client: `http://localhost:5173` (proxies API requests to server)
 
-### Individual commands
+### Available Commands
 
 ```bash
-npm run dev:server   # server only
-npm run dev:client   # client only
+npm start            # production mode (http://localhost:3000)
+npm run dev          # dev mode: server + client with hot-reload
+npm run dev:server   # server only (tsx watch)
+npm run dev:client   # client only (vite)
 npm run dev:relay    # relay server only (:8080)
 npm run build        # production build (server + client)
 npm run build:relay  # production build (relay)

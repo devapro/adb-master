@@ -43,8 +43,8 @@ RUN cd server && npm install --omit=dev
 # Copy built server
 COPY --from=server-builder /app/server/dist ./server/dist
 
-# Copy built client into server's expected path
-COPY --from=client-builder /app/client/dist ./client
+# Copy built client into server's expected path (server resolves ../../client/dist)
+COPY --from=client-builder /app/client/dist ./client/dist
 
 # Non-root user
 RUN addgroup -S adbmaster && adduser -S adbmaster -G adbmaster

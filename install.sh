@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/devapro/adb-master.git"
 INSTALL_DIR="adb-master"
-NODE_MIN_MAJOR=18
+NODE_MIN_MAJOR=20
 
 # ── colours ────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -18,12 +18,24 @@ die()     { echo -e "${RED}[error]${RESET} $*" >&2; exit 1; }
 case "$(uname -s)" in
   Darwin) OS=mac ;;
   Linux)  OS=linux ;;
-  *)      die "Unsupported OS: $(uname -s)" ;;
+  *)      die "Unsupported OS: $(uname -s). On Windows, use WSL or Docker." ;;
 esac
 info "Detected OS: ${OS}"
 
 # ── helpers ────────────────────────────────────────────────────────────────
 have() { command -v "$1" &>/dev/null; }
+
+# Pipe-safe prompt: when running via `curl | bash`, stdin is the script,
+# so we read from /dev/tty to get actual user input.
+ask() {
+  local prompt="$1" varname="$2" default="${3:-}"
+  if [[ -t 0 ]]; then
+    read -rp "$prompt" "$varname"
+  else
+    read -rp "$prompt" "$varname" < /dev/tty || true
+  fi
+  eval "$varname=\${$varname:-$default}"
+}
 
 install_brew() {
   if ! have brew; then
@@ -80,46 +92,28 @@ if $need_node; then
     install_brew
     brew install node
   else
-    if have curl; then
-      info "Setting up NodeSource repository..."
-      curl -fsSL "https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x" | sudo -E bash - \
-        || die "Failed to set up NodeSource repository. Install Node.js >= v${NODE_MIN_MAJOR} manually: https://nodejs.org"
-    fi
     if have apt-get; then
+      if have curl; then
+        info "Setting up NodeSource repository..."
+        curl -fsSL "https://deb.nodesource.com/setup_${NODE_MIN_MAJOR}.x" | sudo -E bash - \
+          || die "Failed to set up NodeSource repository. Install Node.js >= v${NODE_MIN_MAJOR} manually: https://nodejs.org"
+      fi
       sudo apt-get install -y nodejs
     elif have dnf; then
-      sudo dnf module install -y "nodejs:${NODE_MIN_MAJOR}"
+      sudo dnf module install -y "nodejs:${NODE_MIN_MAJOR}" \
+        || { warn "dnf module failed, trying default nodejs package..."; sudo dnf install -y nodejs; }
     elif have yum; then
       sudo yum install -y nodejs
     elif have pacman; then
       sudo pacman -Sy --noconfirm nodejs npm
     else
-      die "Cannot install Node.js: no supported package manager found"
+      die "Cannot install Node.js: no supported package manager found. Install manually: https://nodejs.org"
     fi
   fi
   success "Node.js installed: $(node --version)"
 fi
 
 success "npm: $(npm --version)"
-
-# ── install ADB ────────────────────────────────────────────────────────────
-if have adb; then
-  success "adb already installed: $(adb version | head -1)"
-else
-  warn "adb is not installed."
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  ADB_SCRIPT="$SCRIPT_DIR/install-adb.sh"
-  if [[ -f "$ADB_SCRIPT" ]]; then
-    read -rp "$(echo -e "${CYAN}[info]${RESET} Install ADB now? [Y/n] ")" answer
-    if [[ "${answer:-y}" =~ ^[Yy]$ ]]; then
-      bash "$ADB_SCRIPT"
-    else
-      warn "Skipping ADB install. You will need 'adb' in your PATH to use ADB Master."
-    fi
-  else
-    warn "Install Android platform-tools manually: https://developer.android.com/tools/releases/platform-tools"
-  fi
-fi
 
 # ── clone repo ─────────────────────────────────────────────────────────────
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -128,6 +122,24 @@ if [[ -d "$INSTALL_DIR/.git" ]]; then
 else
   info "Cloning ${REPO_URL}..."
   git clone "$REPO_URL" "$INSTALL_DIR"
+fi
+
+# ── install ADB (after clone, so install-adb.sh is available) ─────────────
+if have adb; then
+  success "adb already installed: $(adb version | head -1)"
+else
+  warn "adb is not installed."
+  ADB_SCRIPT="$INSTALL_DIR/install-adb.sh"
+  if [[ -f "$ADB_SCRIPT" ]]; then
+    ask "$(echo -e "${CYAN}[info]${RESET} Install ADB now? [Y/n] ")" answer "y"
+    if [[ "${answer}" =~ ^[Yy]$ ]]; then
+      bash "$ADB_SCRIPT"
+    else
+      warn "Skipping ADB install. You will need 'adb' in your PATH to use ADB Master."
+    fi
+  else
+    warn "Install Android platform-tools manually: https://developer.android.com/tools/releases/platform-tools"
+  fi
 fi
 
 # ── install dependencies ───────────────────────────────────────────────────
@@ -143,6 +155,6 @@ echo ""
 echo -e "${BOLD}${GREEN}Installation complete!${RESET}"
 echo ""
 echo -e "  ${BOLD}cd ${INSTALL_DIR}${RESET}"
+echo -e "  ${BOLD}npm start${RESET}       — production mode  (http://localhost:3000)"
 echo -e "  ${BOLD}npm run dev${RESET}     — development mode (server :3000 + client :5173)"
-echo -e "  ${BOLD}npm start${RESET}       — production mode (port 3000)"
 echo ""
