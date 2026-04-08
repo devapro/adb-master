@@ -369,7 +369,10 @@ export class RelayServer {
       });
 
       for (const [key, value] of Object.entries(response.headers || {})) {
-        res.setHeader(key, value);
+        // Strip CORS headers — relay's own CORS middleware handles these
+        if (!key.toLowerCase().startsWith('access-control-')) {
+          res.setHeader(key, value);
+        }
       }
 
       if (response.body) {
