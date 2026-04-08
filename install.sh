@@ -120,8 +120,8 @@ fi
 
 # ── move downloaded Node.js into project dir ───────────────────────────────
 if [[ -n "${DOWNLOADED_NODE:-}" ]]; then
-  mkdir -p "$NODE_LOCAL"
-  cp -r "${DOWNLOADED_NODE}/." "$NODE_LOCAL/"
+  rm -rf "$NODE_LOCAL"
+  mv "$DOWNLOADED_NODE" "$NODE_LOCAL"
   NODE_BIN="${NODE_LOCAL}/bin/node"
   NPM_BIN="${NODE_LOCAL}/bin/npm"
   success "Node.js installed to '${NODE_LOCAL}/'"
