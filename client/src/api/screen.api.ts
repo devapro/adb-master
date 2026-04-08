@@ -5,6 +5,14 @@ export const captureScreenshot = (serial: string): Promise<string> =>
     .get(`/devices/${serial}/screen/capture`, { responseType: 'blob' })
     .then((r) => URL.createObjectURL(r.data));
 
+export const getFrame = (serial: string, quality = 70): Promise<ArrayBuffer> =>
+  api
+    .get(`/devices/${serial}/screen/frame`, {
+      params: { quality },
+      responseType: 'arraybuffer',
+    })
+    .then((r) => r.data);
+
 export const startRecording = (serial: string): Promise<void> =>
   api.post(`/devices/${serial}/screen/record/start`).then(() => undefined);
 

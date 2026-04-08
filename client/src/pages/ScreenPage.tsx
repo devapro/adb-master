@@ -1,7 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { screenSocket } from '../socket/socket-client';
+import { useConnectionStore } from '../store/connection.store';
+import { getFrame } from '../api/screen.api';
+import * as inputApi from '../api/input.api';
 import { Button } from '../components/common/Button';
 import { showToast } from '../components/common/Toast';
 import './ScreenPage.css';
@@ -24,6 +27,22 @@ interface PointerState {
   time: number;
 }
 
+function renderFrame(canvas: HTMLCanvasElement, data: ArrayBuffer, renderingRef: React.MutableRefObject<boolean>) {
+  if (renderingRef.current) return;
+  renderingRef.current = true;
+  const blob = new Blob([data], { type: 'image/jpeg' });
+  createImageBitmap(blob).then((bitmap) => {
+    if (canvas.width !== bitmap.width) canvas.width = bitmap.width;
+    if (canvas.height !== bitmap.height) canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    renderingRef.current = false;
+  }).catch(() => {
+    renderingRef.current = false;
+  });
+}
+
 export const ScreenPage: React.FC = () => {
   const { t } = useTranslation();
   const { serial } = useParams<{ serial: string }>();
@@ -35,44 +54,34 @@ export const ScreenPage: React.FC = () => {
   const [actualFps, setActualFps] = useState<number>(0);
   const fpsCounterRef = useRef({ count: 0, lastTime: Date.now() });
   const pointerDownRef = useRef<PointerState | null>(null);
+  const isRemote = useConnectionStore((s) => s.mode) === 'remote';
 
+  // Shared FPS counting logic
+  const countFrame = useCallback(() => {
+    setFrameCount((n) => n + 1);
+    const counter = fpsCounterRef.current;
+    counter.count++;
+    const now = Date.now();
+    const elapsed = now - counter.lastTime;
+    if (elapsed >= 1000) {
+      const raw = (counter.count * 1000) / elapsed;
+      setActualFps(raw < 1 ? parseFloat(raw.toFixed(1)) : Math.round(raw));
+      counter.count = 0;
+      counter.lastTime = now;
+    }
+  }, []);
+
+  // --- Socket.IO streaming (local mode) ---
   useEffect(() => {
+    if (isRemote) return;
+
     screenSocket.connect();
 
     screenSocket.on('screen:frame', (data: ArrayBuffer, _timestamp: number) => {
-      // FPS counting — always count, even if frame is dropped for rendering
-      setFrameCount((n) => n + 1);
-      const counter = fpsCounterRef.current;
-      counter.count++;
-      const now = Date.now();
-      const elapsed = now - counter.lastTime;
-      if (elapsed >= 1000) {
-        const raw = (counter.count * 1000) / elapsed;
-        // Show one decimal for sub-1 fps so slow devices don't show "0 fps"
-        setActualFps(raw < 1 ? parseFloat(raw.toFixed(1)) : Math.round(raw));
-        counter.count = 0;
-        counter.lastTime = now;
-      }
-
-      // Skip if previous frame is still decoding/rendering
+      countFrame();
       const canvas = canvasRef.current;
-      if (!canvas || renderingRef.current) return;
-
-      renderingRef.current = true;
-      // Binary JPEG blob — no base64 decode needed
-      const blob = new Blob([data], { type: 'image/jpeg' });
-
-      // Decode off main thread via createImageBitmap
-      createImageBitmap(blob).then((bitmap) => {
-        if (canvas.width !== bitmap.width) canvas.width = bitmap.width;
-        if (canvas.height !== bitmap.height) canvas.height = bitmap.height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(bitmap, 0, 0);
-        bitmap.close();
-        renderingRef.current = false;
-      }).catch(() => {
-        renderingRef.current = false;
-      });
+      if (!canvas) return;
+      renderFrame(canvas, data, renderingRef);
     });
 
     screenSocket.on('screen:error', (err: { message: string }) => {
@@ -91,25 +100,70 @@ export const ScreenPage: React.FC = () => {
       screenSocket.emit('screen:stop');
       screenSocket.disconnect();
     };
-  }, []);
+  }, [isRemote, countFrame]);
+
+  // --- HTTP polling streaming (relay mode) ---
+  const streamingRef = useRef(false);
+  const fpsRef = useRef(fps);
+  fpsRef.current = fps;
+
+  useEffect(() => {
+    if (!isRemote) return;
+    streamingRef.current = streaming;
+
+    if (!streaming || !serial) return;
+
+    let active = true;
+
+    const poll = async () => {
+      while (active && streamingRef.current) {
+        const start = Date.now();
+        try {
+          const data = await getFrame(serial, 70);
+          if (!active || !streamingRef.current) break;
+          countFrame();
+          const canvas = canvasRef.current;
+          if (canvas) renderFrame(canvas, data, renderingRef);
+        } catch (err: any) {
+          if (!active || !streamingRef.current) break;
+          showToast(err.message || 'Frame capture failed', 'error');
+          setStreaming(false);
+          break;
+        }
+        const elapsed = Date.now() - start;
+        const delay = Math.max(0, Math.round(1000 / fpsRef.current) - elapsed);
+        if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+      }
+    };
+
+    poll();
+
+    return () => {
+      active = false;
+    };
+  }, [isRemote, streaming, serial, countFrame]);
 
   const handleStart = () => {
     if (!serial) return;
     setFrameCount(0);
     setActualFps(0);
     fpsCounterRef.current = { count: 0, lastTime: Date.now() };
-    screenSocket.emit('screen:start', { serial, fps });
+    if (!isRemote) {
+      screenSocket.emit('screen:start', { serial, fps });
+    }
     setStreaming(true);
   };
 
   const handleStop = () => {
-    screenSocket.emit('screen:stop');
+    if (!isRemote) {
+      screenSocket.emit('screen:stop');
+    }
     setStreaming(false);
   };
 
   const handleFpsChange = (newFps: number) => {
     setFps(newFps);
-    if (streaming && serial) {
+    if (streaming && serial && !isRemote) {
       screenSocket.emit('screen:start', { serial, fps: newFps });
     }
   };
@@ -137,21 +191,58 @@ export const ScreenPage: React.FC = () => {
     ArrowDown: 20,
   };
 
+  // --- Input helpers: socket in local mode, REST in relay mode ---
+  const emitTap = (x: number, y: number) => {
+    if (!serial) return;
+    if (isRemote) {
+      inputApi.sendTap(serial, x, y).catch((e) => showToast(e.message, 'error'));
+    } else {
+      screenSocket.emit('input:tap', { serial, x, y });
+    }
+  };
+
+  const emitSwipe = (x1: number, y1: number, x2: number, y2: number, duration: number) => {
+    if (!serial) return;
+    if (isRemote) {
+      inputApi.sendSwipe(serial, x1, y1, x2, y2, duration).catch((e) => showToast(e.message, 'error'));
+    } else {
+      screenSocket.emit('input:swipe', { serial, x1, y1, x2, y2, duration });
+    }
+  };
+
+  const emitKeyEvent = (keycode: number) => {
+    if (!serial) return;
+    if (isRemote) {
+      inputApi.sendKeyEvent(serial, keycode).catch((e) => showToast(e.message, 'error'));
+    } else {
+      screenSocket.emit('input:keyevent', { serial, keycode });
+    }
+  };
+
+  const emitText = (text: string) => {
+    if (!serial) return;
+    if (isRemote) {
+      inputApi.sendText(serial, text).catch((e) => showToast(e.message, 'error'));
+    } else {
+      screenSocket.emit('input:text', { serial, text });
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLCanvasElement>) => {
     if (!serial || !streaming) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return; // let browser shortcuts through
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     e.preventDefault();
     if (SPECIAL_KEYS[e.key] !== undefined) {
-      screenSocket.emit('input:keyevent', { serial, keycode: SPECIAL_KEYS[e.key] });
+      emitKeyEvent(SPECIAL_KEYS[e.key]);
     } else if (e.key.length === 1) {
-      screenSocket.emit('input:text', { serial, text: e.key });
+      emitText(e.key);
     }
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!serial || !streaming) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    e.currentTarget.focus(); // grab keyboard focus so keydown events work immediately
+    e.currentTarget.focus();
     const { x, y } = toDeviceCoords(e.clientX, e.clientY);
     pointerDownRef.current = {
       clientX: e.clientX,
@@ -171,12 +262,10 @@ export const ScreenPage: React.FC = () => {
     const duration = Date.now() - down.time;
 
     if (dClient < 8) {
-      screenSocket.emit('input:tap', { serial, x: down.deviceX, y: down.deviceY });
+      emitTap(down.deviceX, down.deviceY);
     } else {
       const { x: x2, y: y2 } = toDeviceCoords(e.clientX, e.clientY);
-      screenSocket.emit('input:swipe', {
-        serial, x1: down.deviceX, y1: down.deviceY, x2, y2, duration,
-      });
+      emitSwipe(down.deviceX, down.deviceY, x2, y2, duration);
     }
   };
 
@@ -185,8 +274,7 @@ export const ScreenPage: React.FC = () => {
   };
 
   const handleKeyEvent = (code: number) => {
-    if (!serial) return;
-    screenSocket.emit('input:keyevent', { serial, keycode: code });
+    emitKeyEvent(code);
   };
 
   return (

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { LogcatLine, LogLevel } from '../types';
 import { logcatSocket } from '../socket/socket-client';
-import { getSnapshot, clearLogcat } from '../api/logcat.api';
+import { useConnectionStore } from '../store/connection.store';
+import { getSnapshot, clearLogcat, startLogcatStream, pollLogcatStream, stopLogcatStream } from '../api/logcat.api';
 import { Button } from '../components/common/Button';
 import { showToast } from '../components/common/Toast';
 import './LogcatPage.css';
@@ -49,8 +50,12 @@ export const LogcatPage: React.FC = () => {
   const [presetName, setPresetName] = useState('');
   const [showPresetInput, setShowPresetInput] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const isRemote = useConnectionStore((s) => s.mode) === 'remote';
 
+  // Socket.IO logcat (local mode)
   useEffect(() => {
+    if (isRemote) return;
+
     logcatSocket.connect();
 
     logcatSocket.on('logcat:line', (line: LogcatLine) => {
@@ -71,7 +76,41 @@ export const LogcatPage: React.FC = () => {
       logcatSocket.emit('logcat:stop');
       logcatSocket.disconnect();
     };
-  }, []);
+  }, [isRemote]);
+
+  // HTTP polling logcat (relay mode)
+  const cursorRef = useRef(0);
+  useEffect(() => {
+    if (!isRemote || !streaming || !serial) return;
+
+    let active = true;
+    const poll = async () => {
+      while (active) {
+        try {
+          const data = await pollLogcatStream(serial, cursorRef.current);
+          if (!active) break;
+          if (!data.active) {
+            setStreaming(false);
+            break;
+          }
+          if (data.lines.length > 0) {
+            cursorRef.current = data.cursor;
+            setLines((prev) => {
+              const next = [...prev, ...data.lines];
+              if (next.length > 10000) return next.slice(-5000);
+              return next;
+            });
+          }
+        } catch {
+          if (!active) break;
+          // ignore transient errors, keep polling
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    };
+    poll();
+    return () => { active = false; };
+  }, [isRemote, streaming, serial]);
 
   useEffect(() => {
     if (autoScroll && lines.length > 0) {
@@ -79,21 +118,38 @@ export const LogcatPage: React.FC = () => {
     }
   }, [lines.length, autoScroll]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!serial) return;
     setLines([]);
-    logcatSocket.emit('logcat:start', {
-      serial,
-      filters: {
-        level: levelFilter || undefined,
-        tag: tagFilter || undefined,
-      },
-    });
+    cursorRef.current = 0;
+    if (isRemote) {
+      try {
+        await startLogcatStream(serial, {
+          level: levelFilter || undefined,
+          tag: tagFilter || undefined,
+        });
+      } catch (err: any) {
+        showToast(err.message, 'error');
+        return;
+      }
+    } else {
+      logcatSocket.emit('logcat:start', {
+        serial,
+        filters: {
+          level: levelFilter || undefined,
+          tag: tagFilter || undefined,
+        },
+      });
+    }
     setStreaming(true);
   };
 
-  const handleStop = () => {
-    logcatSocket.emit('logcat:stop');
+  const handleStop = async () => {
+    if (isRemote && serial) {
+      await stopLogcatStream(serial).catch(() => {});
+    } else {
+      logcatSocket.emit('logcat:stop');
+    }
     setStreaming(false);
   };
 

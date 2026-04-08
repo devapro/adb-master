@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs';
+import sharp from 'sharp';
 import { screenService } from '../services/screen.service';
 import { deviceGuard } from '../middleware/device-guard';
 
@@ -14,6 +15,27 @@ router.get(
       const buffer = await screenService.captureScreenshot(serial);
       res.set('Content-Type', 'image/png');
       res.send(buffer);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// JPEG frame endpoint for HTTP-based streaming (used in relay mode)
+router.get(
+  '/:serial/screen/frame',
+  deviceGuard,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const serial = req.params.serial as string;
+      const quality = Math.min(100, Math.max(1, parseInt(req.query.quality as string, 10) || 70));
+      const pngBuffer = await screenService.captureScreenshot(serial);
+      const jpegBuffer = await sharp(pngBuffer)
+        .jpeg({ quality, chromaSubsampling: '4:2:0' })
+        .toBuffer();
+      res.set('Content-Type', 'image/jpeg');
+      res.set('Cache-Control', 'no-store');
+      res.send(jpegBuffer);
     } catch (err) {
       next(err);
     }

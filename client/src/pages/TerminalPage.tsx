@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { shellSocket } from '../socket/socket-client';
-import { uploadScript } from '../api/shell.api';
+import { useConnectionStore } from '../store/connection.store';
+import { uploadScript, openShellSession, pollShellSession, sendShellInput, closeShellSession } from '../api/shell.api';
 import { Button } from '../components/common/Button';
 import { showToast } from '../components/common/Toast';
 import '@xterm/xterm/css/xterm.css';
@@ -19,7 +20,10 @@ export const TerminalPage: React.FC = () => {
   const [connected, setConnected] = useState(false);
   const [scriptResults, setScriptResults] = useState<string[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isRemote = useConnectionStore((s) => s.mode) === 'remote';
+  const pollActiveRef = useRef(false);
 
+  // Create terminal + start polling or socket depending on mode
   useEffect(() => {
     if (!termRef.current) return;
 
@@ -47,7 +51,65 @@ export const TerminalPage: React.FC = () => {
     term.writeln('==================');
     term.writeln('');
 
-    // Socket setup
+    const handleResize = () => fit.fit();
+    window.addEventListener('resize', handleResize);
+
+    if (isRemote) {
+      // --- HTTP polling mode (relay) ---
+      term.onData((data) => {
+        if (serial && pollActiveRef.current) {
+          sendShellInput(serial, data).catch(() => {});
+        }
+      });
+
+      if (serial) {
+        term.writeln(`Connecting to ${serial}...\r\n`);
+        pollActiveRef.current = true;
+        let active = true;
+
+        openShellSession(serial)
+          .then(() => {
+            setConnected(true);
+            const poll = async () => {
+              while (active && pollActiveRef.current) {
+                try {
+                  const res = await pollShellSession(serial);
+                  if (!active) break;
+                  if (res.output) term.write(res.output);
+                  if (!res.active) {
+                    term.writeln('\r\n[Session ended]');
+                    setConnected(false);
+                    pollActiveRef.current = false;
+                    break;
+                  }
+                } catch {
+                  if (!active) break;
+                }
+                await new Promise((r) => setTimeout(r, 500));
+              }
+            };
+            poll();
+          })
+          .catch((err) => {
+            term.writeln(`\r\nFailed to connect: ${err.message}\r\n`);
+          });
+
+        return () => {
+          active = false;
+          pollActiveRef.current = false;
+          window.removeEventListener('resize', handleResize);
+          closeShellSession(serial).catch(() => {});
+          term.dispose();
+        };
+      }
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        term.dispose();
+      };
+    }
+
+    // --- Socket.IO mode (local) ---
     shellSocket.connect();
 
     shellSocket.on('shell:output', (data: { data: string }) => {
@@ -59,17 +121,12 @@ export const TerminalPage: React.FC = () => {
       setConnected(false);
     });
 
-    // Send input to server
     term.onData((data) => {
       if (connected) {
         shellSocket.emit('shell:input', { data });
       }
     });
 
-    const handleResize = () => fit.fit();
-    window.addEventListener('resize', handleResize);
-
-    // Auto-connect
     if (serial) {
       shellSocket.emit('shell:open', { serial });
       setConnected(true);
@@ -84,14 +141,43 @@ export const TerminalPage: React.FC = () => {
       shellSocket.disconnect();
       term.dispose();
     };
-  }, [serial]);
+  }, [serial, isRemote]);
 
-  const handleReconnect = () => {
+  const handleReconnect = async () => {
     if (!serial) return;
     termInstance.current?.clear();
-    shellSocket.emit('shell:open', { serial });
-    setConnected(true);
-    termInstance.current?.writeln(`Connecting to ${serial}...\r\n`);
+
+    if (isRemote) {
+      pollActiveRef.current = true;
+      try {
+        await openShellSession(serial);
+        setConnected(true);
+        termInstance.current?.writeln(`Connecting to ${serial}...\r\n`);
+
+        const poll = async () => {
+          while (pollActiveRef.current) {
+            try {
+              const res = await pollShellSession(serial);
+              if (res.output) termInstance.current?.write(res.output);
+              if (!res.active) {
+                termInstance.current?.writeln('\r\n[Session ended]');
+                setConnected(false);
+                pollActiveRef.current = false;
+                break;
+              }
+            } catch { break; }
+            await new Promise((r) => setTimeout(r, 500));
+          }
+        };
+        poll();
+      } catch (err: any) {
+        termInstance.current?.writeln(`\r\nFailed to connect: ${err.message}\r\n`);
+      }
+    } else {
+      shellSocket.emit('shell:open', { serial });
+      setConnected(true);
+      termInstance.current?.writeln(`Connecting to ${serial}...\r\n`);
+    }
   };
 
   const handleScriptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

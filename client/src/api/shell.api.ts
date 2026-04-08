@@ -14,3 +14,18 @@ export const uploadScript = (serial: string, file: File) => {
     })
     .then((r) => r.data.data);
 };
+
+// Managed shell session endpoints (relay mode)
+export const openShellSession = (serial: string) =>
+  api.post(`/devices/${serial}/shell/session`).then((r) => r.data.data);
+
+export const pollShellSession = (serial: string) =>
+  api
+    .get<ApiResponse<{ active: boolean; output: string }>>(`/devices/${serial}/shell/session`)
+    .then((r) => r.data.data);
+
+export const sendShellInput = (serial: string, data: string) =>
+  api.post(`/devices/${serial}/shell/session/input`, { data }).then((r) => r.data.data);
+
+export const closeShellSession = (serial: string) =>
+  api.delete(`/devices/${serial}/shell/session`).then((r) => r.data.data);

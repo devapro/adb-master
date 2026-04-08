@@ -21,7 +21,7 @@ export function createApp(): express.Application {
   app.use('/api', routes);
 
   // Serve client static files in production
-  const clientDir = path.resolve(__dirname, '../../client');
+  const clientDir = path.resolve(__dirname, '../../client/dist');
   app.use(express.static(clientDir));
   app.get('*', (_req, res, next) => {
     if (_req.path.startsWith('/api') || _req.path.startsWith('/socket.io')) {
