@@ -29,22 +29,26 @@ RELAY_URL=https://your-vps.com RELAY_PASSWORD=optional npm run dev:server
 
 ## Architecture
 
-- **Server** (`server/src/`): Express REST API + Socket.IO (3 namespaces: `/devices`, `/logcat`, `/shell`)
+- **Server** (`server/src/`): Express REST API + Socket.IO (4 namespaces: `/devices`, `/logcat`, `/shell`, `/screen`)
   - `services/adb.service.ts` is the single gateway to the `adb` binary — all other services go through it
   - Uses `execFile` (never `exec`) for security
   - Zod validators in `validators/` are applied via `middleware/validate.ts`
   - `middleware/device-guard.ts` checks device serial exists before route handlers
   - `middleware/sanitize.ts` blocks dangerous shell commands
   - Services: `adb`, `device`, `device-info`, `app`, `file`, `screen`, `intent`, `input`, `port`, `settings`, `shell`
-  - `relay/relay-client.ts` — connects to relay server for remote access mode
+  - Screen streaming uses `sharp` for PNG→JPEG conversion (5-15x smaller frames); binary Socket.IO transport
+  - `/screen` namespace also handles low-latency input events (`input:tap`, `input:swipe`, `input:keyevent`, `input:text`)
+  - `relay/relay-client.ts` — connects to relay server for remote access mode; exposes session info via `GET /api/relay/status`
 
 - **Client** (`client/src/`): React 19 + React Router 7 + Zustand state
-  - Pages: Devices, Device Info, Apps, Files, Network, Logcat, Terminal, Input, Settings
+  - Pages: Devices, Device Info, Apps, Files, Network, Logcat, Terminal, Input, Screen, Settings
   - API layer in `api/` uses Axios with dynamic baseURL (local `/api` or remote relay)
-  - Socket.IO client in `socket/socket-client.ts` — 3 connections, supports local + remote mode
+  - Socket.IO client in `socket/socket-client.ts` — 4 connections, supports local + remote mode
+  - Screen page: receives binary JPEG frames, decodes off-thread via `createImageBitmap`, sends input via socket
   - Theming via CSS custom properties in `theme/global.css` (`data-theme` attribute)
   - i18n via i18next — translations in `i18n/en.json` and `i18n/ru.json`
   - `store/connection.store.ts` — local/remote connection mode with localStorage persistence
+  - Header shows relay session badge when server is connected to a relay; Connection Modal shows share URL with copy button
 
 - **Relay** (`relay/src/`): WebSocket tunnel server for remote access
   - Session management with UUID tokens
@@ -69,7 +73,9 @@ RELAY_URL=https://your-vps.com RELAY_PASSWORD=optional npm run dev:server
 - `server/src/services/adb.service.ts` — ADB execution gateway (security boundary)
 - `server/src/utils/command-whitelist.ts` — blocked command patterns
 - `server/src/utils/adb-parser.ts` — parse `adb devices` and logcat output
-- `server/src/relay/relay-client.ts` — relay tunnel client for remote access
+- `server/src/relay/relay-client.ts` — relay tunnel client for remote access + session info API
+- `server/src/routes/relay.router.ts` — relay status endpoint (`GET /api/relay/status`)
+- `server/src/socket/screen.socket.ts` — screen streaming (JPEG frames) + socket-based input
 - `client/src/App.tsx` — routing configuration
 - `client/src/components/layout/AppShell.tsx` — main layout + device socket listener
 - `client/src/store/device.store.ts` — selected device state

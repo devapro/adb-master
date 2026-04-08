@@ -91,6 +91,115 @@
   margin-bottom: 16px;
 }
 
+.relay-session-info {
+  text-align: left;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+.relay-session-info h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.relay-description {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+}
+
+.relay-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.relay-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.relay-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.relay-status-dot.connected {
+  background: var(--color-success);
+}
+
+.relay-status-dot.disconnected {
+  background: var(--color-warning);
+}
+
+.relay-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.relay-share-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.relay-share-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.relay-share-field input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.relay-share-row {
+  display: flex;
+  gap: 6px;
+}
+
+.relay-share-row input {
+  flex: 1;
+}
+
+.relay-copy-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.relay-copy-btn:hover {
+  opacity: 0.85;
+}
+
 .connection-indicator {
   display: flex;
   align-items: center;

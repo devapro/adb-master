@@ -57,3 +57,44 @@
   color: var(--color-text-primary);
   border-color: var(--color-accent);
 }
+
+.relay-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.relay-indicator:hover {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.relay-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.relay-indicator-dot.connected {
+  background: var(--color-success);
+}
+
+.relay-indicator-dot.disconnected {
+  background: var(--color-warning);
+}
+
+.relay-indicator:hover .relay-indicator-dot.connected {
+  background: #fff;
+}

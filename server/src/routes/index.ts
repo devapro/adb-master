@@ -11,9 +11,11 @@ import intentRouter from './intent.router';
 import portRouter from './port.router';
 import inputRouter from './input.router';
 import settingsRouter from './settings.router';
+import relayRouter from './relay.router';
 
 const router = Router();
 
+router.use('/relay', relayRouter);
 router.use('/devices', devicesRouter);
 router.use('/devices', appsRouter);
 router.use('/devices', filesRouter);

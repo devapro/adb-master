@@ -39,6 +39,20 @@ const HOP_BY_HOP_HEADERS = new Set([
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_DELAY_MS = 3000;
 
+export interface RelaySessionInfo {
+  connected: boolean;
+  sessionId: string | null;
+  relayUrl: string;
+  shareUrl: string | null;
+  hasPassword: boolean;
+}
+
+let activeRelayClient: RelayClient | null = null;
+
+export function getActiveRelayClient(): RelayClient | null {
+  return activeRelayClient;
+}
+
 export class RelayClient {
   private relayUrl: string;
   private localPort: number;
@@ -54,6 +68,17 @@ export class RelayClient {
     this.relayUrl = relayUrl.replace(/\/$/, '');
     this.localPort = localPort;
     this.password = password || undefined;
+    activeRelayClient = this;
+  }
+
+  getSessionInfo(): RelaySessionInfo {
+    return {
+      connected: this.ws?.readyState === WebSocket.OPEN,
+      sessionId: this.sessionId,
+      relayUrl: this.relayUrl,
+      shareUrl: this.sessionId ? `${this.relayUrl}/relay/${this.sessionId}/` : null,
+      hasPassword: !!this.password,
+    };
   }
 
   async start(): Promise<void> {

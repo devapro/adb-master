@@ -32,8 +32,8 @@ Web interface for managing Android devices via ADB. Control your device from a b
 ### Screen
 - **Screenshot Capture** — take screenshots, preview, and download as PNG
 - **Screen Recording** — start/stop recording with timer, download as MP4
-- **Live Screen Stream** — real-time device screen in the browser at 1–5 fps
-- **Interactive Control** — click to tap, drag to swipe, type to send text; Home/Back/Recents/Volume key bar
+- **Live Screen Stream** — real-time device screen in the browser (1–30 fps); JPEG compression via `sharp` for fast transfer, binary Socket.IO transport, off-thread decoding
+- **Interactive Control** — click to tap, drag to swipe, type to send text; Home/Back/Recents/Volume key bar; low-latency input via WebSocket
 
 ### Network
 - **WiFi Toggle** — enable/disable WiFi
@@ -59,6 +59,7 @@ Web interface for managing Android devices via ADB. Control your device from a b
 ### Remote Access
 - **Relay Server** — run on a VPS to bridge remote clients to a local ADB server
 - **Remote Mode** — connect to any relay from the browser with a session code
+- **Session Display** — when relay is active, the web UI shows the session share URL with a copy button (header badge + connection modal)
 - **Password Protection** — optional password per relay session
 
 ## Architecture
@@ -155,7 +156,8 @@ RELAY_PORT=8080 npm run dev:relay
 
 # 2. On PC with device — connect to relay
 RELAY_URL=https://your-vps.com RELAY_PASSWORD=optional npm run dev:server
-# → Prints a session code to share
+# → Session info appears in the web UI (green "Relay" badge in header)
+# → Click the badge or connection indicator to see the share URL and copy it
 
 # 3. Remote user — open client in browser
 #    Click connection indicator in header
@@ -227,6 +229,7 @@ Key endpoints:
 | PUT | `/api/devices/:serial/settings/:ns` | Update setting |
 | POST | `/api/devices/:serial/intent` | Send intent |
 | POST | `/api/devices/:serial/shell` | Execute command |
+| GET | `/api/relay/status` | Relay session info (if active) |
 
 Real-time events via Socket.IO namespaces: `/devices`, `/logcat`, `/shell`, `/screen`.
 
@@ -273,7 +276,7 @@ adb-master/
 
 ## Tech Stack
 
-**Server:** Express, Socket.IO, TypeScript, Zod, Winston, Multer
+**Server:** Express, Socket.IO, TypeScript, Zod, Winston, Multer, Sharp
 
 **Client:** React 19, React Router 7, Vite, Axios, Socket.IO Client, Zustand, i18next, xterm.js
 

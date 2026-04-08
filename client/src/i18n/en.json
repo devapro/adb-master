@@ -308,7 +308,16 @@
     "invalidSession": "Invalid session",
     "checking": "Checking connection...",
     "remoteMode": "Remote",
-    "localMode": "Local"
+    "localMode": "Local",
+    "relayActive": "Relay",
+    "relaySession": "Relay Session",
+    "relaySessionInfo": "This server is connected to a relay. Share the link below so others can access your devices remotely.",
+    "shareUrl": "Share URL",
+    "copied": "Copied!",
+    "copy": "Copy",
+    "relayConnected": "Connected",
+    "relayDisconnected": "Disconnected",
+    "passwordProtected": "Password protected"
   },
   "common": {
     "loading": "Loading...",

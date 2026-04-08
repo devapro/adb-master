@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDeviceStore } from '../../store/device.store';
 import { useThemeStore } from '../../store/theme.store';
 import { useLocaleStore } from '../../store/locale.store';
 import { useConnectionStore } from '../../store/connection.store';
+import { getRelayStatus, RelaySessionInfo } from '../../api/relay.api';
 import { ConnectionModal } from '../common/ConnectionModal';
 import './Header.css';
 
@@ -16,6 +17,15 @@ export const Header: React.FC = () => {
   const sessionId = useConnectionStore((s) => s.sessionId);
   const connected = useConnectionStore((s) => s.connected);
   const [modalOpen, setModalOpen] = useState(false);
+  const [relayInfo, setRelayInfo] = useState<RelaySessionInfo | null>(null);
+
+  useEffect(() => {
+    if (connectionMode === 'local') {
+      getRelayStatus().then(setRelayInfo).catch(() => setRelayInfo(null));
+    } else {
+      setRelayInfo(null);
+    }
+  }, [connectionMode]);
 
   return (
     <header className="header">
@@ -37,6 +47,12 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="header-right">
+        {relayInfo && relayInfo.sessionId && (
+          <button className="relay-indicator" onClick={() => setModalOpen(true)}>
+            <span className={`relay-indicator-dot ${relayInfo.connected ? 'connected' : 'disconnected'}`} />
+            {t('connection.relayActive')}
+          </button>
+        )}
         <button className="connection-indicator" onClick={() => setModalOpen(true)}>
           <span
             className={`connection-dot ${connectionMode}${connectionMode === 'remote' && !connected ? ' disconnected' : ''}`}

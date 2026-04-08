@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useConnectionStore } from '../../store/connection.store';
 import { reconnectSockets } from '../../socket/socket-client';
+import { getRelayStatus, RelaySessionInfo } from '../../api/relay.api';
 import { Button } from './Button';
 import './ConnectionModal.css';
 import './Modal.css';
@@ -25,6 +26,25 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({ open, onClose 
   const [password, setPassword] = useState(storedPassword);
   const [status, setStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
+  const [relayInfo, setRelayInfo] = useState<RelaySessionInfo | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (open && mode === 'local') {
+      getRelayStatus().then(setRelayInfo).catch(() => setRelayInfo(null));
+    }
+  }, [open, mode]);
+
+  const handleCopyShareUrl = async () => {
+    if (!relayInfo?.shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(relayInfo.shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+    }
+  };
 
   if (!open) return null;
 
@@ -134,6 +154,34 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({ open, onClose 
           {tab === 'local' && (
             <div className="connection-local">
               <p>{t('connection.useLocal')}</p>
+              {relayInfo && relayInfo.sessionId && (
+                <div className="relay-session-info">
+                  <h4>{t('connection.relaySession')}</h4>
+                  <p className="relay-description">{t('connection.relaySessionInfo')}</p>
+                  <div className="relay-details">
+                    <div className="relay-status-row">
+                      <span className={`relay-status-dot ${relayInfo.connected ? 'connected' : 'disconnected'}`} />
+                      <span>{relayInfo.connected ? t('connection.relayConnected') : t('connection.relayDisconnected')}</span>
+                      {relayInfo.hasPassword && (
+                        <span className="relay-badge">{t('connection.passwordProtected')}</span>
+                      )}
+                    </div>
+                    <div className="relay-share-field">
+                      <label>{t('connection.shareUrl')}</label>
+                      <div className="relay-share-row">
+                        <input type="text" readOnly value={relayInfo.shareUrl || ''} />
+                        <button className="relay-copy-btn" onClick={handleCopyShareUrl}>
+                          {copied ? t('connection.copied') : t('connection.copy')}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relay-share-field">
+                      <label>{t('connection.sessionId')}</label>
+                      <input type="text" readOnly value={relayInfo.sessionId || ''} className="mono" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
