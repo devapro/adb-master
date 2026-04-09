@@ -85,7 +85,7 @@ if [[ -z "$NODE_BIN" ]]; then
   NODE_VER=$(curl -fsSL "https://nodejs.org/dist/latest-v${NODE_LTS_MAJOR}.x/SHASUMS256.txt" \
     | grep -oE "node-v[0-9.]+-${NODE_OS}-${NODE_ARCH}\.tar\.gz" \
     | head -1 \
-    | grep -oE 'v[0-9.]+')
+    | grep -oE 'v[0-9.]+' || true)
   [[ -z "$NODE_VER" ]] && die "Could not resolve Node.js v${NODE_LTS_MAJOR} version."
 
   NODE_FILE="node-${NODE_VER}-${NODE_OS}-${NODE_ARCH}.tar.gz"
@@ -114,6 +114,7 @@ else
   # GitHub archives extract as "<repo>-<branch>/"
   EXTRACTED=$(find "$TEMP" -maxdepth 1 -type d -name "adb-master-*" | head -1)
   [[ -z "$EXTRACTED" ]] && die "Unexpected archive structure — cannot find extracted project folder."
+  rm -rf "$INSTALL_DIR"
   mv "$EXTRACTED" "$INSTALL_DIR"
   success "Project downloaded to '${INSTALL_DIR}/'"
 fi
@@ -143,6 +144,11 @@ else
   else
     warn "Install Android platform-tools manually: https://developer.android.com/tools/releases/platform-tools"
   fi
+fi
+
+# ── if using local Node.js, add it to PATH so npm's shebang can find node ──
+if [[ "$NODE_BIN" == "${NODE_LOCAL}/bin/node" ]]; then
+  export PATH="${NODE_LOCAL}/bin:${PATH}"
 fi
 
 # ── install npm dependencies + build ──────────────────────────────────────
@@ -185,7 +191,7 @@ if [[ -f "$LAUNCHER" ]]; then
   echo -e "  ${BOLD}./dev.sh${RESET}       — development mode (server :3000 + client :5173)"
   echo ""
   echo -e "  Or add the bundled Node.js to your PATH permanently:"
-  echo -e "  ${BOLD}export PATH=\"\$HOME/$(realpath --relative-to="$HOME" "${INSTALL_DIR}" 2>/dev/null || echo "${INSTALL_DIR}")/.nodejs/bin:\$PATH\"${RESET}"
+  echo -e "  ${BOLD}export PATH=\"${NODE_LOCAL}/bin:\$PATH\"${RESET}"
 else
   echo -e "  ${BOLD}npm start${RESET}      — production mode  (http://localhost:3000)"
   echo -e "  ${BOLD}npm run dev${RESET}    — development mode (server :3000 + client :5173)"
