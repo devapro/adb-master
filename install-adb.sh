@@ -62,6 +62,7 @@ sudo mv "$TEMP_DIR/platform-tools" "$INSTALL_DIR"
 sudo chmod -R a+rX "$INSTALL_DIR"
 
 # ── symlink key binaries ──────────────────────────────────────────────────
+sudo mkdir -p "$BIN_DIR"
 for bin in adb fastboot; do
   sudo ln -sf "$INSTALL_DIR/$bin" "$BIN_DIR/$bin"
 done
