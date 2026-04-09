@@ -44,7 +44,16 @@ export class RelayServer {
 
   constructor() {
     this.app.use(cors({ origin: config.corsOrigin }));
-    this.app.use(express.json({ limit: '1mb' }));
+    // Parse JSON only for relay's own routes, not tunneled requests.
+    // Tunneled requests need the raw body stream intact for readRequestBody().
+    const jsonParser = express.json({ limit: '1mb' });
+    this.app.use((req, res, next) => {
+      if (req.headers['x-relay-session']) {
+        next();
+      } else {
+        jsonParser(req, res, next);
+      }
+    });
 
     this.server = http.createServer(this.app);
 

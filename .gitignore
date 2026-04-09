@@ -2,6 +2,7 @@ node_modules
 .claude
 client/dist
 server/dist
+relay/dist
 .env
 .DS_Store
 .idea

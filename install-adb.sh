@@ -56,6 +56,7 @@ unzip -q "$TEMP_DIR/platform-tools.zip" -d "$TEMP_DIR"
 
 # ── install full platform-tools directory ──────────────────────────────────
 info "Installing to $INSTALL_DIR (requires sudo)..."
+sudo mkdir -p "$(dirname "$INSTALL_DIR")"
 sudo rm -rf "$INSTALL_DIR"
 sudo mv "$TEMP_DIR/platform-tools" "$INSTALL_DIR"
 sudo chmod -R a+rX "$INSTALL_DIR"
