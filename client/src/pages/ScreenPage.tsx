@@ -7,6 +7,8 @@ import { showToast } from '../components/common/Toast';
 import './ScreenPage.css';
 
 const FPS_OPTIONS = [1, 2, 3, 5];
+const QUALITY_OPTIONS = [30, 50, 70, 90];
+const SCALE_OPTIONS = [25, 50, 75, 100];
 
 const KEY_BAR: { labelKey: string; code: number }[] = [
   { labelKey: 'input.back', code: 4 },
@@ -31,6 +33,8 @@ export const ScreenPage: React.FC = () => {
   const renderingRef = useRef(false);
   const [streaming, setStreaming] = useState(false);
   const [fps, setFps] = useState(1);
+  const [quality, setQuality] = useState(70);
+  const [scale, setScale] = useState(100);
   const [frameCount, setFrameCount] = useState(0);
   const [actualFps, setActualFps] = useState<number>(0);
   const fpsCounterRef = useRef({ count: 0, lastTime: Date.now() });
@@ -98,7 +102,7 @@ export const ScreenPage: React.FC = () => {
     setFrameCount(0);
     setActualFps(0);
     fpsCounterRef.current = { count: 0, lastTime: Date.now() };
-    screenSocket.emit('screen:start', { serial, fps });
+    screenSocket.emit('screen:start', { serial, fps, quality, scale });
     setStreaming(true);
   };
 
@@ -107,11 +111,30 @@ export const ScreenPage: React.FC = () => {
     setStreaming(false);
   };
 
+  const restartStream = (opts: { fps?: number; quality?: number; scale?: number }) => {
+    if (streaming && serial) {
+      screenSocket.emit('screen:start', {
+        serial,
+        fps: opts.fps ?? fps,
+        quality: opts.quality ?? quality,
+        scale: opts.scale ?? scale,
+      });
+    }
+  };
+
   const handleFpsChange = (newFps: number) => {
     setFps(newFps);
-    if (streaming && serial) {
-      screenSocket.emit('screen:start', { serial, fps: newFps });
-    }
+    restartStream({ fps: newFps });
+  };
+
+  const handleQualityChange = (newQuality: number) => {
+    setQuality(newQuality);
+    restartStream({ quality: newQuality });
+  };
+
+  const handleScaleChange = (newScale: number) => {
+    setScale(newScale);
+    restartStream({ scale: newScale });
   };
 
   // Map canvas client coords → device pixel coords
@@ -170,7 +193,9 @@ export const ScreenPage: React.FC = () => {
     const dClient = Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY);
     const duration = Date.now() - down.time;
 
-    if (dClient < 8) {
+    if (dClient < 8 && duration >= 300) {
+      screenSocket.emit('input:longtap', { serial, x: down.deviceX, y: down.deviceY, duration });
+    } else if (dClient < 8) {
       screenSocket.emit('input:tap', { serial, x: down.deviceX, y: down.deviceY });
     } else {
       const { x: x2, y: y2 } = toDeviceCoords(e.clientX, e.clientY);
@@ -203,6 +228,32 @@ export const ScreenPage: React.FC = () => {
               onClick={() => handleFpsChange(f)}
             >
               {f}
+            </button>
+          ))}
+        </div>
+
+        <div className="screen-fps-group">
+          <span className="screen-fps-label">{t('screen.quality')}:</span>
+          {QUALITY_OPTIONS.map((q) => (
+            <button
+              key={q}
+              className={`screen-fps-btn${quality === q ? ' active' : ''}`}
+              onClick={() => handleQualityChange(q)}
+            >
+              {q}%
+            </button>
+          ))}
+        </div>
+
+        <div className="screen-fps-group">
+          <span className="screen-fps-label">{t('screen.scale')}:</span>
+          {SCALE_OPTIONS.map((s) => (
+            <button
+              key={s}
+              className={`screen-fps-btn${scale === s ? ' active' : ''}`}
+              onClick={() => handleScaleChange(s)}
+            >
+              {s}%
             </button>
           ))}
         </div>

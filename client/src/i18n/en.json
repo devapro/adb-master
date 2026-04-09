@@ -336,6 +336,8 @@
     "start": "Start Stream",
     "stop": "Stop Stream",
     "fps": "FPS",
+    "quality": "Quality",
+    "scale": "Scale",
     "frames": "frames",
     "placeholder": "Press Start Stream to begin",
     "waiting": "Waiting for first frame..."

@@ -18,9 +18,9 @@ export function setupScreenSocket(nsp: Namespace): void {
       }
     };
 
-    socket.on('screen:start', (data: { serial: string; fps?: number; quality?: number }) => {
+    socket.on('screen:start', (data: { serial: string; fps?: number; quality?: number; scale?: number }) => {
       stopStream();
-      const { serial, fps = 1, quality = 70 } = data;
+      const { serial, fps = 1, quality = 70, scale = 100 } = data;
       const intervalMs = Math.max(50, Math.round(1000 / Math.min(fps, 30)));
       streaming = true;
 
@@ -32,7 +32,17 @@ export function setupScreenSocket(nsp: Namespace): void {
           if (!streaming) return;
 
           // PNG→JPEG: typically 5-15x smaller, much faster to transfer & decode
-          const jpegBuffer = await sharp(pngBuffer)
+          let pipeline = sharp(pngBuffer);
+          if (scale > 0 && scale < 100) {
+            const meta = await pipeline.metadata();
+            if (meta.width && meta.height) {
+              pipeline = pipeline.resize(
+                Math.round(meta.width * scale / 100),
+                Math.round(meta.height * scale / 100),
+              );
+            }
+          }
+          const jpegBuffer = await pipeline
             .jpeg({ quality, chromaSubsampling: '4:2:0' })
             .toBuffer();
 
@@ -60,6 +70,14 @@ export function setupScreenSocket(nsp: Namespace): void {
     socket.on('input:tap', async (data: { serial: string; x: number; y: number }) => {
       try {
         await inputService.sendTap(data.serial, data.x, data.y);
+      } catch (err: any) {
+        socket.emit('input:error', { message: err.message });
+      }
+    });
+
+    socket.on('input:longtap', async (data: { serial: string; x: number; y: number; duration: number }) => {
+      try {
+        await inputService.sendLongTap(data.serial, data.x, data.y, data.duration);
       } catch (err: any) {
         socket.emit('input:error', { message: err.message });
       }

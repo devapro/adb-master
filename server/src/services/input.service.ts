@@ -21,6 +21,12 @@ class InputService {
     return result.exitCode === 0;
   }
 
+  async sendLongTap(serial: string, x: number, y: number, duration: number): Promise<boolean> {
+    // Long tap = swipe with same start/end point and held duration
+    const result = await adbService.shell(serial, `input swipe ${x} ${y} ${x} ${y} ${duration}`);
+    return result.exitCode === 0;
+  }
+
   async sendSwipe(
     serial: string,
     x1: number,
