@@ -4,7 +4,7 @@ import os from 'os';
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   adbPath: process.env.ADB_PATH || 'adb',
-  commandTimeout: parseInt(process.env.COMMAND_TIMEOUT || '30000', 10),
+  commandTimeout: parseInt(process.env.COMMAND_TIMEOUT || '45000', 10),
   maxScriptSize: 64 * 1024, // 64KB
   scriptTimeout: 5 * 60 * 1000, // 5 minutes
   devicePollInterval: 3000, // 3 seconds

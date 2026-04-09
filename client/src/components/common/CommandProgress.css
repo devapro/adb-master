@@ -1,0 +1,48 @@
+.command-progress {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  animation: command-progress-in 0.2s ease;
+}
+
+.command-progress-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.command-progress-text {
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.command-progress-time {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  min-width: 40px;
+}
+
+@keyframes command-progress-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

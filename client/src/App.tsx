@@ -12,11 +12,13 @@ import { InputPage } from './pages/InputPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ScreenPage } from './pages/ScreenPage';
 import { ToastContainer } from './components/common/Toast';
+import { CommandProgress } from './components/common/CommandProgress';
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
       <ToastContainer />
+      <CommandProgress />
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/" element={<Navigate to="/devices" replace />} />

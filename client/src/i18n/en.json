@@ -321,6 +321,9 @@
     "relayDisconnected": "Disconnected",
     "passwordProtected": "Password protected"
   },
+  "command": {
+    "inProgress": "Command in progress..."
+  },
   "common": {
     "loading": "Loading...",
     "error": "An error occurred",

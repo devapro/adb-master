@@ -321,6 +321,9 @@
     "relayDisconnected": "Отключено",
     "passwordProtected": "Защищено паролем"
   },
+  "command": {
+    "inProgress": "Выполнение команды..."
+  },
   "common": {
     "loading": "Загрузка...",
     "error": "Произошла ошибка",
