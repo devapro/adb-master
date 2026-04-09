@@ -143,7 +143,8 @@ export class RelayClient {
       .replace(/^https:/, 'wss:');
     const wsEndpoint = `${wsUrl}/relay/agent/${this.sessionId}?secret=${this.secret}`;
 
-    this.ws = new WebSocket(wsEndpoint);
+    // maxPayload must accommodate base64-encoded file uploads (500MB * 4/3 ≈ 700MB)
+    this.ws = new WebSocket(wsEndpoint, { maxPayload: 700 * 1024 * 1024 });
 
     this.ws.on('open', () => {
       logger.info('Connected to relay server via WebSocket');
@@ -261,7 +262,8 @@ export class RelayClient {
       );
 
       localReq.on('error', reject);
-      localReq.setTimeout(60000, () => {
+      // Must be long enough for adb push (large files) and adb shell operations
+      localReq.setTimeout(10 * 60 * 1000, () => {
         localReq.destroy(new Error('Local request timeout'));
       });
 

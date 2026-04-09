@@ -1,38 +1,47 @@
 import { Namespace } from 'socket.io';
 import sharp from 'sharp';
 import { logger } from '../utils/logger';
-import { screenService } from '../services/screen.service';
 import { inputService } from '../services/input.service';
+import { ScreenStream } from '../services/screen-stream';
 
 export function setupScreenSocket(nsp: Namespace): void {
   nsp.on('connection', (socket) => {
     logger.info(`Screen socket connected: ${socket.id}`);
     let streaming = false;
-    let streamTimer: NodeJS.Timeout | null = null;
+    let currentStream: ScreenStream | null = null;
 
     const stopStream = () => {
       streaming = false;
-      if (streamTimer) {
-        clearTimeout(streamTimer);
-        streamTimer = null;
+      if (currentStream) {
+        currentStream.stop();
+        currentStream = null;
       }
     };
 
     socket.on('screen:start', (data: { serial: string; fps?: number; quality?: number; scale?: number }) => {
       stopStream();
-      const { serial, fps = 1, quality = 70, scale = 100 } = data;
-      const intervalMs = Math.max(50, Math.round(1000 / Math.min(fps, 30)));
+      const { serial, fps = 5, quality = 70, scale = 100 } = data;
+      const minInterval = Math.max(33, Math.round(1000 / Math.min(fps, 30)));
       streaming = true;
 
-      const captureLoop = async () => {
-        if (!streaming) return;
-        const start = Date.now();
-        try {
-          const pngBuffer = await screenService.captureScreenshot(serial);
-          if (!streaming) return;
+      const stream = new ScreenStream();
+      currentStream = stream;
 
-          // PNG→JPEG: typically 5-15x smaller, much faster to transfer & decode
-          let pipeline = sharp(pngBuffer);
+      let processing = false;
+      let latestFrame: Buffer | null = null;
+      let lastAcceptTime = 0;
+
+      const processFrame = async () => {
+        if (!streaming || !latestFrame) {
+          processing = false;
+          return;
+        }
+        processing = true;
+        const frame = latestFrame;
+        latestFrame = null;
+
+        try {
+          let pipeline = sharp(frame);
           if (scale > 0 && scale < 100) {
             const meta = await pipeline.metadata();
             if (meta.width && meta.height) {
@@ -47,23 +56,51 @@ export function setupScreenSocket(nsp: Namespace): void {
             .toBuffer();
 
           if (streaming) {
-            // volatile: drop frame if client buffer is full (prefer latest frame)
-            // Binary Buffer sent directly — no base64 overhead
             socket.volatile.emit('screen:frame', jpegBuffer, Date.now());
           }
         } catch (err: any) {
-          logger.warn(`Screen capture error for ${serial}: ${err.message}`);
-          if (streaming) {
-            socket.emit('screen:error', { message: err.message });
-          }
+          logger.warn(`Screen frame processing error for ${serial}: ${err.message}`);
         }
-        if (streaming) {
-          const delay = Math.max(0, intervalMs - (Date.now() - start));
-          streamTimer = setTimeout(captureLoop, delay);
+
+        processing = false;
+
+        // If a newer frame arrived while we were processing, handle it now
+        if (latestFrame && streaming) {
+          processFrame();
         }
       };
 
-      captureLoop();
+      stream.on('frame', (pngBuffer: Buffer) => {
+        if (!streaming) return;
+
+        // FPS throttling — drop frames that arrive faster than target
+        const now = Date.now();
+        if (now - lastAcceptTime < minInterval) return;
+        lastAcceptTime = now;
+
+        // Always keep only the latest frame; stale frames are discarded
+        latestFrame = pngBuffer;
+
+        if (!processing) {
+          processFrame();
+        }
+      });
+
+      stream.on('close', () => {
+        if (streaming) {
+          socket.emit('screen:error', { message: 'Screen capture stream ended' });
+          stopStream();
+        }
+      });
+
+      stream.on('error', (err: Error) => {
+        if (streaming) {
+          socket.emit('screen:error', { message: err.message });
+          stopStream();
+        }
+      });
+
+      stream.start(serial, fps);
     });
 
     // Input via socket — lower latency than REST for interactive use

@@ -52,4 +52,4 @@ export const downloadFile = (serial: string, devicePath: string) =>
     });
 
 export const deleteFile = (serial: string, path: string, isDirectory: boolean = false) =>
-  api.delete<ApiResponse<{ success: boolean }>>(`/devices/${serial}/files`, { data: { path, isDirectory } }).then((r) => r.data.data);
+  api.delete<ApiResponse<{ success: boolean }>>(`/devices/${serial}/files`, { data: { path, isDirectory }, timeout: 2 * 60 * 1000 }).then((r) => r.data.data);

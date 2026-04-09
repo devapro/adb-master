@@ -66,7 +66,8 @@ export class RelayServer {
     this.setupSocketIO();
 
     // Raw WebSocket for agent connections (noServer — we route upgrades manually)
-    this.wss = new WebSocketServer({ noServer: true });
+    // maxPayload must accommodate base64-encoded file uploads (500MB * 4/3 ≈ 700MB)
+    this.wss = new WebSocketServer({ noServer: true, maxPayload: 700 * 1024 * 1024 });
     this.server.on('upgrade', (req, socket, head) => {
       this.handleUpgrade(req, socket, head);
     });
