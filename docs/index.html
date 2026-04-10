@@ -1193,7 +1193,7 @@
         <div class="feature-icon fi-orange">🖥️</div>
         <div class="feature-title">Screen &amp; Control</div>
         <ul class="feature-list">
-          <li>Live screen stream at 1–5 fps in browser</li>
+          <li>Live screen stream at 1–30 fps in browser</li>
           <li>Click to tap · drag to swipe on the canvas</li>
           <li>Screenshot (PNG) &amp; screen recording (MP4)</li>
           <li>Type text directly to device remotely</li>
@@ -1404,7 +1404,7 @@
           </tr>
           <tr>
             <td class="row-label">Live screen view</td>
-            <td class="col-us"><span class="chk">✓</span> 1–5 fps streaming</td>
+            <td class="col-us"><span class="chk">✓</span> 1–30 fps streaming</td>
             <td><span class="chk">✓</span> 60+ fps (fastest)</td>
             <td><span class="chk">✓</span></td>
             <td><span class="chk">✓</span></td>
@@ -1510,14 +1510,14 @@
   <div class="container">
     <div class="section-label">Installation</div>
     <h2 class="section-title">Get started in minutes</h2>
-    <p class="section-desc">Node.js ≥ 18 and ADB are the only requirements. No native apps, no heavy IDEs.</p>
+    <p class="section-desc">Node.js ≥ 20 and ADB are the only requirements. No native apps, no heavy IDEs.</p>
 
     <div class="steps-grid">
       <div class="step-card">
         <div class="step-number">1</div>
         <div class="step-title">Install prerequisites</div>
-        <p class="step-desc">Make sure Node.js ≥ 18 and ADB are installed and available on your PATH.</p>
-        <pre style="margin-top:12px; font-size:0.78rem;">node --version  # ≥ 18
+        <p class="step-desc">Make sure Node.js ≥ 20 and ADB are installed and available on your PATH.</p>
+        <pre style="margin-top:12px; font-size:0.78rem;">node --version  # ≥ 20
 adb version</pre>
       </div>
       <div class="step-card">
@@ -1545,7 +1545,7 @@ npm install</pre>
     <div class="install-block">
       <div class="install-block-label">One-liner (macOS / Linux)</div>
       <pre>curl -fsSL https://raw.githubusercontent.com/devapro/adb-master/main/install.sh | bash
-cd adb-master && npm run dev</pre>
+cd adb-master && npm start</pre>
     </div>
 
     <div class="install-block">
