@@ -43,7 +43,11 @@ export class RelayServer {
   private sessionManager = new SessionManager();
 
   constructor() {
-    this.app.use(cors({ origin: config.corsOrigin }));
+    this.app.use(cors({
+      origin: config.corsOrigin,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'x-relay-session', 'x-relay-password', 'x-relay-secret'],
+    }));
     // Parse JSON only for relay's own routes, not tunneled requests.
     // Tunneled requests need the raw body stream intact for readRequestBody().
     const jsonParser = express.json({ limit: '1mb' });
@@ -59,7 +63,7 @@ export class RelayServer {
 
     // Socket.IO server for client connections (handles /socket.io/ upgrades)
     this.io = new SocketIOServer(this.server, {
-      cors: { origin: '*' },
+      cors: { origin: config.corsOrigin },
       pingInterval: 25000,
       pingTimeout: 20000,
     });
@@ -225,6 +229,11 @@ export class RelayServer {
       }
 
       this.handleTunnelRequest(req, res, sessionId);
+    });
+
+    // Fallback for requests that didn't match any route and weren't tunneled
+    this.app.use((_req, res) => {
+      res.status(404).json({ error: 'Not found' });
     });
   }
 
@@ -406,6 +415,12 @@ export class RelayServer {
 
   private readRequestBody(req: express.Request): Promise<Buffer> {
     return new Promise((resolve, reject) => {
+      // If the stream is already consumed or destroyed, return empty buffer
+      if (req.readableEnded || req.destroyed) {
+        resolve(Buffer.alloc(0));
+        return;
+      }
+
       const chunks: Buffer[] = [];
       let size = 0;
 

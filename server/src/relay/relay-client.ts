@@ -127,7 +127,7 @@ export class RelayClient {
     try {
       const url = `${this.relayUrl}/relay/sessions/${this.sessionId}`;
       await this.httpRequest(url, 'DELETE', undefined, {
-        'x-session-secret': this.secret!,
+        'x-relay-secret': this.secret!,
       });
       logger.info('Relay session deleted');
     } catch (err) {
@@ -227,6 +227,11 @@ export class RelayClient {
       const bodyBuffer = req.body ? Buffer.from(req.body, 'base64') : undefined;
       if (bodyBuffer) {
         headers['content-length'] = String(bodyBuffer.length);
+      } else {
+        // No body — remove stale content-length and content-type to prevent
+        // the local server's body parser from trying to parse a non-existent body
+        delete headers['content-length'];
+        delete headers['content-type'];
       }
 
       const localReq = http.request(
