@@ -292,6 +292,8 @@
     "disableAnimations": "Отключить анимации",
     "enableAnimations": "Включить анимации",
     "showTaps": "Показать касания",
+    "enableStayAwake": "Включить «Не спать»",
+    "disableStayAwake": "Отключить «Не спать»",
     "loading": "Загрузка настроек..."
   },
   "connection": {

@@ -142,9 +142,11 @@ export const ScreenPage: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
+    // canvas.width is at `scale`% of device resolution, so multiply by 100/scale to get real device coords
+    const scaleFactor = 100 / scale;
     return {
-      x: Math.round((clientX - rect.left) * (canvas.width / rect.width)),
-      y: Math.round((clientY - rect.top) * (canvas.height / rect.height)),
+      x: Math.round((clientX - rect.left) * (canvas.width / rect.width) * scaleFactor),
+      y: Math.round((clientY - rect.top) * (canvas.height / rect.height) * scaleFactor),
     };
   };
 

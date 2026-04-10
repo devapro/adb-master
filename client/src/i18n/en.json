@@ -292,6 +292,8 @@
     "disableAnimations": "Disable Animations",
     "enableAnimations": "Enable Animations",
     "showTaps": "Show Taps",
+    "enableStayAwake": "Enable Stay Awake",
+    "disableStayAwake": "Disable Stay Awake",
     "loading": "Loading settings..."
   },
   "connection": {

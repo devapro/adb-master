@@ -21,6 +21,7 @@ export const SettingsPage: React.FC = () => {
   const [editValue, setEditValue] = useState('');
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [stayAwake, setStayAwake] = useState<boolean | null>(null);
 
   const loadSettings = useCallback(async () => {
     if (!serial) return;
@@ -37,6 +38,14 @@ export const SettingsPage: React.FC = () => {
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  useEffect(() => {
+    if (!serial) return;
+    listSettings(serial, 'global').then((data) => {
+      const s = data.find((s) => s.key === 'stay_on_while_plugged_in');
+      setStayAwake(s ? s.value !== '0' : false);
+    }).catch(() => {});
+  }, [serial]);
 
   const handlePut = async (key: string, value: string) => {
     if (!serial) return;
@@ -94,6 +103,19 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleToggleStayAwake = async () => {
+    if (!serial) return;
+    const newVal = stayAwake ? '0' : '7';
+    try {
+      await putSetting(serial, 'global', 'stay_on_while_plugged_in', newVal);
+      setStayAwake(!stayAwake);
+      showToast(t('common.success'), 'success');
+      if (namespace === 'global') await loadSettings();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const handleToggleShowTaps = async () => {
     if (!serial) return;
     const current = settings.find((s) => s.key === 'show_touches');
@@ -133,6 +155,9 @@ export const SettingsPage: React.FC = () => {
           </Button>
           <Button variant="secondary" size="sm" onClick={handleToggleShowTaps}>
             {t('settings.showTaps')}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleToggleStayAwake} disabled={stayAwake === null}>
+            {stayAwake ? t('settings.disableStayAwake') : t('settings.enableStayAwake')}
           </Button>
         </div>
       </div>
