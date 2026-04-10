@@ -13,9 +13,13 @@ class AppService {
       .split('\n')
       .filter((l) => l.startsWith('package:'))
       .map((l) => {
-        const match = l.match(/^package:(.+?)=(.+)$/);
-        if (!match) return null;
-        return { apkPath: match[1], packageName: match[2].trim() };
+        const content = l.slice('package:'.length);
+        const lastEq = content.lastIndexOf('=');
+        if (lastEq === -1) return null;
+        const apkPath = content.slice(0, lastEq);
+        const packageName = content.slice(lastEq + 1).trim();
+        if (!apkPath || !packageName) return null;
+        return { apkPath, packageName };
       })
       .filter((p): p is { apkPath: string; packageName: string } => p !== null);
 
