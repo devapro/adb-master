@@ -2,6 +2,8 @@
 
 Web interface for managing Android devices via ADB. Control your device from a browser — locally or remotely.
 
+![photo_2026-04-12 01 15 05](https://github.com/user-attachments/assets/039d429e-d074-4e9a-a6d9-4b367a91c14e)
+
 ## Features
 
 ### Device Management
