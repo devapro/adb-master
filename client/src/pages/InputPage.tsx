@@ -35,13 +35,23 @@ export const InputPage: React.FC = () => {
   const [swipeDuration, setSwipeDuration] = useState('');
   const [sending, setSending] = useState(false);
 
+  // A `false` success means the device accepted the command but injection did
+  // not take effect (most often the Xiaomi "USB debugging (Security settings)"
+  // case). Surface it instead of falsely reporting success.
+  const reportResult = (result: { success: boolean }) => {
+    if (result.success) {
+      showToast(t('common.success'), 'success');
+    } else {
+      showToast(t('input.notAccepted'), 'error');
+    }
+    return result.success;
+  };
+
   const handleSendText = async () => {
     if (!serial || !text.trim()) return;
     setSending(true);
     try {
-      await sendText(serial, text);
-      showToast(t('common.success'), 'success');
-      setText('');
+      if (reportResult(await sendText(serial, text))) setText('');
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -55,8 +65,7 @@ export const InputPage: React.FC = () => {
     if (isNaN(x) || isNaN(y) || x < 0 || y < 0) return;
     setSending(true);
     try {
-      await sendTap(serial, x, y);
-      showToast(t('common.success'), 'success');
+      reportResult(await sendTap(serial, x, y));
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -74,8 +83,7 @@ export const InputPage: React.FC = () => {
     if (dur !== undefined && (isNaN(dur) || dur < 0 || dur > 10000)) return;
     setSending(true);
     try {
-      await sendSwipe(serial, x1, y1, x2, y2, dur);
-      showToast(t('common.success'), 'success');
+      reportResult(await sendSwipe(serial, x1, y1, x2, y2, dur));
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -86,8 +94,7 @@ export const InputPage: React.FC = () => {
     if (!serial) return;
     setSending(true);
     try {
-      await sendKeyEvent(serial, code);
-      showToast(t('common.success'), 'success');
+      reportResult(await sendKeyEvent(serial, code));
     } catch (err: any) {
       showToast(err.message, 'error');
     }

@@ -103,10 +103,24 @@ export function setupScreenSocket(nsp: Namespace): void {
       stream.start(serial, fps);
     });
 
-    // Input via socket — lower latency than REST for interactive use
+    // Input via socket — lower latency than REST for interactive use.
+    // `false` means the device accepted the command but injection did not take
+    // effect; a thrown error carries an actionable message (e.g. the Xiaomi
+    // "USB debugging (Security settings)" hint). Surface both so interactive
+    // input never fails silently.
+    const reportInput = (ok: boolean) => {
+      if (!ok) {
+        socket.emit('input:error', {
+          message:
+            'The device did not accept the input event. Check that input ' +
+            'injection is permitted for this device.',
+        });
+      }
+    };
+
     socket.on('input:tap', async (data: { serial: string; x: number; y: number }) => {
       try {
-        await inputService.sendTap(data.serial, data.x, data.y);
+        reportInput(await inputService.sendTap(data.serial, data.x, data.y));
       } catch (err: any) {
         socket.emit('input:error', { message: err.message });
       }
@@ -114,7 +128,7 @@ export function setupScreenSocket(nsp: Namespace): void {
 
     socket.on('input:longtap', async (data: { serial: string; x: number; y: number; duration: number }) => {
       try {
-        await inputService.sendLongTap(data.serial, data.x, data.y, data.duration);
+        reportInput(await inputService.sendLongTap(data.serial, data.x, data.y, data.duration));
       } catch (err: any) {
         socket.emit('input:error', { message: err.message });
       }
@@ -125,7 +139,9 @@ export function setupScreenSocket(nsp: Namespace): void {
       x2: number; y2: number; duration?: number;
     }) => {
       try {
-        await inputService.sendSwipe(data.serial, data.x1, data.y1, data.x2, data.y2, data.duration);
+        reportInput(
+          await inputService.sendSwipe(data.serial, data.x1, data.y1, data.x2, data.y2, data.duration)
+        );
       } catch (err: any) {
         socket.emit('input:error', { message: err.message });
       }
@@ -133,7 +149,7 @@ export function setupScreenSocket(nsp: Namespace): void {
 
     socket.on('input:keyevent', async (data: { serial: string; keycode: number }) => {
       try {
-        await inputService.sendKeyEvent(data.serial, data.keycode);
+        reportInput(await inputService.sendKeyEvent(data.serial, data.keycode));
       } catch (err: any) {
         socket.emit('input:error', { message: err.message });
       }
@@ -141,7 +157,7 @@ export function setupScreenSocket(nsp: Namespace): void {
 
     socket.on('input:text', async (data: { serial: string; text: string }) => {
       try {
-        await inputService.sendText(data.serial, data.text);
+        reportInput(await inputService.sendText(data.serial, data.text));
       } catch (err: any) {
         socket.emit('input:error', { message: err.message });
       }

@@ -2,6 +2,38 @@
 
 Web interface for managing Android devices via ADB. Control your device from a browser — locally or remotely.
 
+## Quick Start
+
+**Prerequisites:** [Node.js](https://nodejs.org) >= 20 and [ADB](https://developer.android.com/tools/adb) on your PATH (`adb version` should work).
+
+**One-line install** (Mac / Linux — installs git, Node.js, and ADB if missing, then clones and builds):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/devapro/adb-master/main/install.sh | bash
+```
+
+**Or install manually:**
+
+```bash
+git clone https://github.com/devapro/adb-master.git
+cd adb-master
+npm install      # install all workspace dependencies
+npm run build    # build server + client
+```
+
+**Run it:**
+
+```bash
+npm start
+```
+
+Then open **http://localhost:3000** — the server serves both the API and the web UI.
+
+> **Developing?** Use `npm run dev` instead for hot-reload (server on `:3000`, client on `:5173`).
+> **Windows?** Use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or [Docker](#docker-deployment) — the install script supports Mac and Linux only.
+
+See [Installation](#installation) and [Connecting a Device](#connecting-a-device) for full details.
+
 ## Features
 
 ### Device Management
@@ -150,6 +182,8 @@ npm run build:relay  # production build (relay)
 adb tcpip 5555
 adb connect <device-ip>:5555
 ```
+
+> **Xiaomi / MIUI / HyperOS users:** If the device connects but **taps, swipes and typing don't work** (Screen and Input pages), enable **"USB debugging (Security settings)"** in Developer Options. This is a *separate* switch from the normal "USB debugging" toggle and is required to simulate input. It can auto-revert and may require a signed-in Xiaomi account and a SIM card to turn on. The app will now show an explanatory error instead of failing silently when this is the cause.
 
 ## Remote Access Setup
 

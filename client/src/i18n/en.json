@@ -273,7 +273,8 @@
     "tab": "Tab",
     "playPause": "Play/Pause",
     "next": "Next",
-    "prev": "Previous"
+    "prev": "Previous",
+    "notAccepted": "The device did not accept the input event. On Xiaomi (MIUI/HyperOS) phones, enable \"USB debugging (Security settings)\" in Developer Options — it is separate from the normal \"USB debugging\" toggle and is required to simulate input."
   },
   "settings": {
     "title": "Settings",
