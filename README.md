@@ -332,4 +332,4 @@ To add a language:
 
 ## License
 
-ISC
+Licensed under the [ISC License](./LICENSE).

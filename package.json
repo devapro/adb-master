@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Manage Android devices via ADB from a web interface",
   "license": "ISC",
-  "author": "",
+  "author": "Arsenii Kharlanov",
   "private": true,
   "bin": {
     "adb-master": "./bin/adb-master.js"
